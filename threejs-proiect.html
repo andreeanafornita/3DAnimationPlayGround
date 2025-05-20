@@ -18,10 +18,10 @@
       border-radius: 8px;
       max-width: 250px;
     }
-    #planetControls {
-      top: 400px;
-      right: 10px;
-    }
+#planetControls {
+  top: 100px;
+  left: 10px;
+}
     #controls label, #controls button, #controls select, 
     #planetControls label, #planetControls button, #planetControls input {
       display: block;
@@ -63,6 +63,7 @@
       font-family: Arial, sans-serif;
     }
   </style>
+  <link rel="icon" href="data:,">
 </head>
 <body>
   <div id="controls">
@@ -702,37 +703,99 @@
     scene.add(asteroidMesh);
 
     // Spaceship
-    let spaceship;
-    const loader = new THREE.GLTFLoader();
-    loader.load(
-      'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf',
-      (gltf) => {
-        spaceship = gltf.scene;
-        spaceship.scale.set(0.5, 0.5, 0.5);
-        spaceship.position.set(50, 10, 0);
-        spaceship.userData = { speed: 0.5, velocity: new THREE.Vector3(), shield: false };
-        scene.add(spaceship);
-        planets.push(spaceship);
+// Înlocuiește secțiunea navei spațiale actuale cu aceste modificări:
 
-        const shieldGeometry = new THREE.SphereGeometry(2, 32, 32);
-        const shieldMaterial = new THREE.MeshBasicMaterial({ color: 0x00aaff, transparent: true, opacity: 0.3 });
-        const shield = new THREE.Mesh(shieldGeometry, shieldMaterial);
-        shield.visible = false;
-        spaceship.add(shield);
-      },
-      undefined,
-      (error) => {
-        console.error('Failed to load spaceship model:', error);
-        // Fallback: Create a simple cube as spaceship
-        const fallbackGeometry = new THREE.BoxGeometry(2, 2, 2);
-        const fallbackMaterial = new THREE.MeshStandardMaterial({ color: 0x00aaff });
-        spaceship = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
-        spaceship.position.set(50, 10, 0);
-        spaceship.userData = { speed: 0.5, velocity: new THREE.Vector3(), shield: false };
-        scene.add(spaceship);
-        planets.push(spaceship);
-      }
-    );
+// Creează o navă spațială simplă (în loc de a încărca modelul)
+const shipGroup = new THREE.Group();
+
+// Corp principal - mai mare
+const shipBody = new THREE.Mesh(
+  new THREE.CylinderGeometry(0, 4, 16, 8), // Dimensiuni duble
+  new THREE.MeshStandardMaterial({ 
+    color: 0x3366ff,
+    emissive: 0x112244, // Strălucire pentru vizibilitate
+    emissiveIntensity: 0.5
+  })
+);
+shipBody.rotation.x = Math.PI / 2;
+shipGroup.add(shipBody);
+
+// Aripi - mai mari
+const wingGeometry = new THREE.BoxGeometry(20, 1, 6); // Dimensiuni duble
+const wingMaterial = new THREE.MeshStandardMaterial({ 
+  color: 0x2244aa,
+  emissive: 0x112233, // Strălucire pentru vizibilitate
+  emissiveIntensity: 0.5
+});
+const wings = new THREE.Mesh(wingGeometry, wingMaterial);
+wings.position.y = -1;
+shipGroup.add(wings);
+
+// Cabină - mai mare și mai vizibilă
+const cabin = new THREE.Mesh(
+  new THREE.SphereGeometry(2.4, 16, 16), // Dimensiuni duble
+  new THREE.MeshStandardMaterial({ 
+    color: 0x88ccff,
+    transparent: true,
+    opacity: 0.7,
+    emissive: 0x4488cc, // Strălucire pentru vizibilitate
+    emissiveIntensity: 0.7
+  })
+);
+cabin.position.z = 4;
+cabin.position.y = 1;
+shipGroup.add(cabin);
+
+// Motoare - pentru vizibilitate
+const engineGeometry = new THREE.CylinderGeometry(1.5, 1, 2, 16);
+const engineMaterial = new THREE.MeshStandardMaterial({
+  color: 0xffaa22,
+  emissive: 0xff5500,
+  emissiveIntensity: 0.8
+});
+const leftEngine = new THREE.Mesh(engineGeometry, engineMaterial);
+leftEngine.position.set(-8, -1, -6);
+leftEngine.rotation.x = Math.PI / 2;
+shipGroup.add(leftEngine);
+
+const rightEngine = new THREE.Mesh(engineGeometry, engineMaterial);
+rightEngine.position.set(8, -1, -6);
+rightEngine.rotation.x = Math.PI / 2;
+shipGroup.add(rightEngine);
+
+// Scutul - mai mare
+const shieldGeometry = new THREE.SphereGeometry(10, 32, 32); // Dimensiune dublă
+const shieldMaterial = new THREE.MeshBasicMaterial({ 
+  color: 0x00aaff, 
+  transparent: true, 
+  opacity: 0.3 
+});
+const shield = new THREE.Mesh(shieldGeometry, shieldMaterial);
+shield.visible = false;
+shipGroup.add(shield);
+
+// Poziționează nava
+shipGroup.position.set(50, 10, 0);
+
+shipGroup.userData = { 
+  speed: 10,
+  velocity: new THREE.Vector3(),
+  shield: false,
+  maxSpeed: 10,
+  // Proprietăți modificate pentru orbită
+  orbitRadius: 150,  // Rază orbită mai mare (era 100)
+  orbitAngle: 0,
+  orbitSpeed: 0.01,  // Viteza și mai redusă (era 0.05)
+  isOrbiting: true,
+  // Modificăm centrul orbitei pentru a fi în afara găurii negre
+  orbitCenter: new THREE.Vector3(50, 0, 50), // Centru diferit de gaura neagră
+  orbitHeight: 20    // Înălțime mai mare pentru a evita gaura neagră
+};
+
+
+scene.add(shipGroup);
+planets.push(shipGroup);
+spaceship = shipGroup;
 
     // Nebula Background
     const nebulaTexture = textureLoader.load(
@@ -843,11 +906,68 @@ function onMouseMove(event) {
         document.getElementById('freeCam').style.background = '#444';
         document.getElementById('shipCam').style.background = '#444';
       }
+        if (event.key === 'z' || event.key === 'Z' || 
+      event.key === 'x' || event.key === 'X') {
+    keys[event.key.toLowerCase()] = true;
+  }
     });
     window.addEventListener('keyup', (event) => {
       keys[event.key.toLowerCase()] = false;
     });
+// Adaugă acest cod în event listener-ul pentru keydown:
+window.addEventListener('keydown', (event) => {
+  keys[event.key.toLowerCase()] = true;
+  // Detectarea tastelor speciale 
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || 
+      event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    keys[event.key.toLowerCase()] = true;
+  }
+  
+  // Controlul modului camerei
+  if (event.key === 'q' || event.key === 'Q') {
+    cameraMode = 'free';
+    controls.enabled = true;
+    document.getElementById('freeCam').style.background = '#666';
+    document.getElementById('shipCam').style.background = '#444';
+    document.getElementById('cinematicCam').style.background = '#444';
+  }
+  if (event.key === 'e' || event.key === 'E') {
+    cameraMode = 'ship';
+    controls.enabled = false;
+    document.getElementById('shipCam').style.background = '#666';
+    document.getElementById('freeCam').style.background = '#444';
+    document.getElementById('cinematicCam').style.background = '#444';
+  }
+  if (event.key === 'r' || event.key === 'R') {
+    cameraMode = 'cinematic';
+    controls.enabled = false;
+    document.getElementById('cinematicCam').style.background = '#666';
+    document.getElementById('freeCam').style.background = '#444';
+    document.getElementById('shipCam').style.background = '#444';
+  }
+  
+  // Comutare între modurile de control al navei (orbită/direct)
+  if (event.key === ' ' && spaceship) {
+    spaceship.userData.isOrbiting = !spaceship.userData.isOrbiting;
+    document.getElementById('info').innerText = spaceship.userData.isOrbiting ? 
+      'Orbit mode: Use arrow keys to control direction' : 
+      'Direct control mode: Use WASD to control ship';
+    
+    // Dacă trecem la control direct, vom reseta viteza
+    if (!spaceship.userData.isOrbiting) {
+      spaceship.userData.velocity.set(0, 0, 0);
+    }
+  }
+});
 
+window.addEventListener('keyup', (event) => {
+  keys[event.key.toLowerCase()] = false;
+  // Detectarea tastelor speciale
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || 
+      event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+    keys[event.key.toLowerCase()] = false;
+  }
+});
     // Controls
     let starDensity = 2000;
     const starDensityInput = document.getElementById('starDensity');
@@ -943,11 +1063,145 @@ function onMouseMove(event) {
     });
 
     shieldModeCheckbox.addEventListener('change', () => {
-      if (spaceship) {
-        spaceship.userData.shield = shieldModeCheckbox.checked;
-        spaceship.children[0].visible = shieldModeCheckbox.checked;
+// Înlocuiește secțiunea "Update Spaceship" din funcția animate() cu acest cod:
+// Update Spaceship
+if (spaceship.userData.isOrbiting) {
+  // Controlul direcției cu săgeți stânga-dreapta
+  if (keys['arrowright']) {
+    // Mișcare FOARTE lentă la dreapta
+    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.5;
+  } else if (keys['arrowleft']) {
+    // Mișcare FOARTE lentă la stânga
+    spaceship.userData.orbitAngle -= spaceship.userData.orbitSpeed * delta * 0.5;
+  } else {
+    // Mișcare automată EXTREM de lentă
+    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.1;
+  }
+  
+  // Controlul înălțimii - mișcare lentă și pe verticală
+  if (keys['arrowup']) {
+    spaceship.userData.orbitHeight += 0.5 * delta;
+  } else if (keys['arrowdown']) {
+    spaceship.userData.orbitHeight = Math.max(5, spaceship.userData.orbitHeight - 0.5 * delta);
+  }
+
+  // Calculează poziția pe orbită
+  const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius * Math.cos(spaceship.userData.orbitAngle);
+  const newZ = spaceship.userData.orbitCenter.z + spaceship.userData.orbitRadius * Math.sin(spaceship.userData.orbitAngle);
+  const newPosition = new THREE.Vector3(newX, spaceship.userData.orbitHeight, newZ);
+  
+  // Mișcare FOARTE lentă și fluidă prin interpolarea poziției
+  spaceship.position.lerp(newPosition, 0.02); // Factor de interpolare mic pentru mișcare lentă
+  
+  // Rotire lentă și fluidă a navei
+  const tangentDirection = new THREE.Vector3(
+    -Math.sin(spaceship.userData.orbitAngle),
+    0,
+    Math.cos(spaceship.userData.orbitAngle)
+  );
+  
+  const targetRotation = Math.atan2(tangentDirection.x, tangentDirection.z);
+  const currentRotation = spaceship.rotation.y;
+  let rotDiff = targetRotation - currentRotation;
+  
+  // Normalizare pentru rotire fluidă
+  if (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
+  if (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
+  
+  // Rotire FOARTE lentă
+  spaceship.rotation.y += rotDiff * 0.02;
+  
+  // Efecte vizuale pentru motoare
+  if (spaceship.children[3] && spaceship.children[4]) {
+    // Intensitate redusă pentru motoare (efect de mișcare lentă)
+    spaceship.children[3].material.emissiveIntensity = 0.4;
+    spaceship.children[4].material.emissiveIntensity = 0.4;
+  }
+} else {
+    // Modul normal de control direct - păstrăm acest cod pentru a putea schimba între moduri
+    // Forțe de mișcare mai mici pentru un zbor mai lent și controlat
+    const moveForce = spaceship.userData.speed * delta * 0.5;
+    
+    if (keys['w']) spaceship.userData.velocity.z -= moveForce;
+    if (keys['s']) spaceship.userData.velocity.z += moveForce;
+    if (keys['a']) spaceship.userData.velocity.x -= moveForce;
+    if (keys['d']) spaceship.userData.velocity.x += moveForce;
+    
+    // Adăugăm și control pe axa Y
+    if (keys['q']) spaceship.userData.velocity.y += moveForce;
+    if (keys['z']) spaceship.userData.velocity.y -= moveForce;
+
+    // Limitează viteza pentru un zbor mai stabil
+    const speed = spaceship.userData.velocity.length();
+    if (speed > spaceship.userData.maxSpeed) {
+      spaceship.userData.velocity.multiplyScalar(spaceship.userData.maxSpeed / speed);
+    }
+
+    // Efectul gravitațional redus considerabil
+    const bhPos = new THREE.Vector3(0, 0, 0);
+    const shipPos = spaceship.position;
+    const distanceToBH = shipPos.distanceTo(bhPos);
+    if (distanceToBH > 15) {
+      // Reduce forța gravitațională cu 90%
+      const gravityStrength = 10 / (distanceToBH * distanceToBH); // Redus de 100x
+      const gravityDir = bhPos.clone().sub(shipPos).normalize();
+      spaceship.userData.velocity.add(gravityDir.multiplyScalar(gravityStrength * delta));
+    }
+
+    // Adaugă frecare/rezistență mai mare pentru a încetini nava
+    spaceship.position.add(spaceship.userData.velocity.clone().multiplyScalar(delta));
+    spaceship.userData.velocity.multiplyScalar(0.97); // Frecare mai mare
+    
+    // Rotația mai lină a navei
+    const targetRotation = Math.atan2(spaceship.userData.velocity.x, spaceship.userData.velocity.z);
+    // Interpolăm pentru o rotație mai fluidă
+    const currentRotation = spaceship.rotation.y;
+    const rotDiff = targetRotation - currentRotation;
+    
+    // Normalizează diferența pentru a evita rotirea în direcția greșită
+    let normalizedDiff = rotDiff;
+    if (rotDiff > Math.PI) normalizedDiff -= 2 * Math.PI;
+    if (rotDiff < -Math.PI) normalizedDiff += 2 * Math.PI;
+    
+    // Rotește nava treptat către direcția de mișcare
+    spaceship.rotation.y += normalizedDiff * 0.1;
+    
+    // Afișează lumini de motor când se deplasează
+    const engineGlow = spaceship.userData.velocity.length() > 0.1;
+    if (spaceship.children[3] && spaceship.children[4]) {
+      spaceship.children[3].material.emissiveIntensity = engineGlow ? 0.8 : 0.2;
+      spaceship.children[4].material.emissiveIntensity = engineGlow ? 0.8 : 0.2;
+    }
+  }
+  
+  // Verifică coliziunea cu asteroizi (indiferent de modul de control)
+  if (!spaceship.userData.shield) {
+    for (let i = 0; i < asteroidCount; i++) {
+      const asteroidPos = asteroidPositions[i].position;
+      const distance = spaceship.position.distanceTo(asteroidPos);
+      if (distance < 4) {
+        if (spaceship.userData.isOrbiting) {
+          // Doar ajustează traiectoria în modul orbită
+          spaceship.userData.orbitAngle += 0.1;
+        } else {
+          // Respinge nava în modul de control direct
+          spaceship.userData.velocity.multiplyScalar(-0.5);
+        }
+        
+        if (audioInitialized && !collisionSound.isPlaying) collisionSound.play();
+        explosion.position.copy(spaceship.position);
+        explosion.visible = true;
+        setTimeout(() => { explosion.visible = false; }, 500);
+        document.getElementById('info').innerText = 'Collision with asteroid!';
+        setTimeout(() => {
+          document.getElementById('info').innerText = 'Use arrow keys to control orbit direction. Space to toggle control mode.';
+        }, 2000);
+        break;
       }
-    });
+    }
+  }
+}
+    );
 
     freeCamButton.addEventListener('click', () => {
       cameraMode = 'free';
@@ -973,12 +1227,28 @@ function onMouseMove(event) {
       shipCamButton.style.background = '#444';
     });
 
-    resetShipButton.addEventListener('click', () => {
-      if (spaceship) {
-        spaceship.position.set(50, 10, 0);
-        spaceship.userData.velocity.set(0, 0, 0);
-      }
-    });
+resetShipButton.addEventListener('click', () => {
+  if (spaceship) {
+    // Resetăm orbita la valorile modificate
+    spaceship.userData.orbitRadius = 150;
+    spaceship.userData.orbitAngle = 0;
+    spaceship.userData.orbitHeight = 20;
+    spaceship.userData.orbitCenter = new THREE.Vector3(50, 0, 50);
+    
+    // Poziționăm nava pe orbită
+    const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius;
+    const newZ = spaceship.userData.orbitCenter.z;
+    spaceship.position.set(newX, spaceship.userData.orbitHeight, newZ);
+    
+    // Resetăm viteza
+    spaceship.userData.velocity.set(0, 0, 0);
+    
+    // Asigurăm-ne că nava este în modul orbită
+    spaceship.userData.isOrbiting = true;
+    
+    document.getElementById('info').innerText = 'Ship reset to orbit mode. Use arrow keys to control direction. Z/X to change orbit radius.';
+  }
+});
 
 saveStateButton.addEventListener('click', () => {
   const state = {
@@ -1001,10 +1271,7 @@ saveStateButton.addEventListener('click', () => {
     } : null
   };
   localStorage.setItem('galaxyState', JSON.stringify(state));
-  document.getElementById('info').innerText = 'State saved!';
-  setTimeout(() => {
-    document.getElementById('info').innerText = 'Click to focus, drag planets to move. WASD for ship. Q/E/R for camera. Avoid asteroids!';
-  }, 2000);
+document.getElementById('info').innerText = 'Click to focus, drag planets. Arrow keys for orbit direction. Z/X for orbit radius. Space toggles modes.';
 });
 
     loadStateButton.addEventListener('click', () => {
@@ -1256,44 +1523,111 @@ createPlanetButton.addEventListener('click', () => {
       }
 
       // Update Spaceship
-      if (spaceship) {
-        if (keys['w']) spaceship.userData.velocity.z -= spaceship.userData.speed * delta;
-        if (keys['s']) spaceship.userData.velocity.z += spaceship.userData.speed * delta;
-        if (keys['a']) spaceship.userData.velocity.x -= spaceship.userData.speed * delta;
-        if (keys['d']) spaceship.userData.velocity.x += spaceship.userData.speed * delta;
+if (spaceship && spaceship.userData.isOrbiting) {
+  // Controlul foarte lent al direcției cu săgeți stânga-dreapta
+  if (keys['arrowright']) {
+    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.2;
+  } else if (keys['arrowleft']) {
+    spaceship.userData.orbitAngle -= spaceship.userData.orbitSpeed * delta * 0.2;
+  } else {
+    // Mișcare automată foarte lentă
+    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.05;
+  }
+  
+  // Controlul înălțimii - mișcare extrem de lentă pe verticală
+  if (keys['arrowup']) {
+    spaceship.userData.orbitHeight += 0.2 * delta;
+  } else if (keys['arrowdown']) {
+    spaceship.userData.orbitHeight = Math.max(15, spaceship.userData.orbitHeight - 0.2 * delta);
+  }
 
-        const bhPos = new THREE.Vector3(0, 0, 0);
-        const shipPos = spaceship.position;
-        const distanceToBH = shipPos.distanceTo(bhPos);
-        if (distanceToBH > 15) {
-          const gravityStrength = 1000 / (distanceToBH * distanceToBH);
-          const gravityDir = bhPos.clone().sub(shipPos).normalize();
-          spaceship.userData.velocity.add(gravityDir.multiplyScalar(gravityStrength * delta));
-        }
+  // Schimbarea razei orbitei - adăugat nou
+  if (keys['z']) {
+    // Mărește raza orbitei foarte lent
+    spaceship.userData.orbitRadius += 0.5 * delta;
+  } else if (keys['x']) {
+    // Micșorează raza orbitei foarte lent, dar nu mai mică de 100
+    spaceship.userData.orbitRadius = Math.max(100, spaceship.userData.orbitRadius - 0.5 * delta);
+  }
 
-        if (!spaceship.userData.shield) {
-          for (let i = 0; i < asteroidCount; i++) {
-            const asteroidPos = asteroidPositions[i].position;
-            const distance = shipPos.distanceTo(asteroidPos);
-            if (distance < 2) {
-              spaceship.userData.velocity.multiplyScalar(-0.5);
-              if (audioInitialized && !collisionSound.isPlaying) collisionSound.play();
-              explosion.position.copy(shipPos);
-              explosion.visible = true;
-              setTimeout(() => { explosion.visible = false; }, 500);
-              document.getElementById('info').innerText = 'Collision with asteroid!';
-              setTimeout(() => {
-                document.getElementById('info').innerText = 'Click to focus, drag planets to move. WASD for ship. Q/E/R for camera. Avoid asteroids!';
-              }, 2000);
-              break;
-            }
-          }
-        }
+  // Calculează poziția pe orbită bazată pe centrul modificat
+  const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius * Math.cos(spaceship.userData.orbitAngle);
+  const newZ = spaceship.userData.orbitCenter.z + spaceship.userData.orbitRadius * Math.sin(spaceship.userData.orbitAngle);
+  const newPosition = new THREE.Vector3(newX, spaceship.userData.orbitHeight, newZ);
+  
+  // Mișcare FOARTE lentă și fluidă prin interpolare foarte redusă
+  spaceship.position.lerp(newPosition, 0.01); // Factor de interpolare redus pentru mișcare și mai lentă
+  
+  // Rotire foarte lentă și fluidă a navei pentru a urmări direcția de deplasare
+  const tangentDirection = new THREE.Vector3(
+    -Math.sin(spaceship.userData.orbitAngle),
+    0,
+    Math.cos(spaceship.userData.orbitAngle)
+  );
+  
+  const targetRotation = Math.atan2(tangentDirection.x, tangentDirection.z);
+  const currentRotation = spaceship.rotation.y;
+  let rotDiff = targetRotation - currentRotation;
+  
+  // Normalizare pentru rotire fluidă
+  if (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
+  if (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
+  
+  // Rotire extrem de lentă
+  spaceship.rotation.y += rotDiff * 0.01;
+  
+  // Efecte vizuale pentru motoare - intensitate foarte redusă
+  if (spaceship.children[3] && spaceship.children[4]) {
+    spaceship.children[3].material.emissiveIntensity = 0.3;
+    spaceship.children[4].material.emissiveIntensity = 0.3;
+  }
+} else if (spaceship) {
+  // Modul de control direct - fără atracție de la gaura neagră
+  const moveForce = spaceship.userData.speed * delta * 0.3; // Forță redusă
+  
+  if (keys['w']) spaceship.userData.velocity.z -= moveForce;
+  if (keys['s']) spaceship.userData.velocity.z += moveForce;
+  if (keys['a']) spaceship.userData.velocity.x -= moveForce;
+  if (keys['d']) spaceship.userData.velocity.x += moveForce;
+  
+  // Control pe axa Y
+  if (keys['q']) spaceship.userData.velocity.y += moveForce;
+  if (keys['z']) spaceship.userData.velocity.y -= moveForce;
 
-        spaceship.position.add(spaceship.userData.velocity.clone().multiplyScalar(delta));
-        spaceship.userData.velocity.multiplyScalar(0.99);
-        spaceship.rotation.y = Math.atan2(spaceship.userData.velocity.x, spaceship.userData.velocity.z);
-      }
+  // Limitează viteza pentru un zbor stabil
+  const speed = spaceship.userData.velocity.length();
+  if (speed > spaceship.userData.maxSpeed * 0.5) { // Viteză maximă redusă la jumătate
+    spaceship.userData.velocity.multiplyScalar((spaceship.userData.maxSpeed * 0.5) / speed);
+  }
+
+  // ELIMINARE COMPLETĂ a efectului gravitațional al găurii negre
+  // Nu mai includem niciun cod legat de atracția gravitațională
+
+  // Adaugă frecare/rezistență pentru a încetini nava
+  spaceship.position.add(spaceship.userData.velocity.clone().multiplyScalar(delta));
+  spaceship.userData.velocity.multiplyScalar(0.98); // Frecare pentru încetinire treptată
+  
+  // Rotație lină a navei către direcția de deplasare
+  if (spaceship.userData.velocity.length() > 0.01) {
+    const targetRotation = Math.atan2(spaceship.userData.velocity.x, spaceship.userData.velocity.z);
+    const currentRotation = spaceship.rotation.y;
+    let normalizedDiff = targetRotation - currentRotation;
+    
+    // Normalizare pentru rotire fluidă
+    if (normalizedDiff > Math.PI) normalizedDiff -= 2 * Math.PI;
+    if (normalizedDiff < -Math.PI) normalizedDiff += 2 * Math.PI;
+    
+    // Rotire lentă
+    spaceship.rotation.y += normalizedDiff * 0.05;
+  }
+  
+  // Ajustează lumina motoarelor
+  const engineGlow = spaceship.userData.velocity.length() > 0.05;
+  if (spaceship.children[3] && spaceship.children[4]) {
+    spaceship.children[3].material.emissiveIntensity = engineGlow ? 0.6 : 0.2;
+    spaceship.children[4].material.emissiveIntensity = engineGlow ? 0.6 : 0.2;
+  }
+}
 
       // Update Planets
       planets.forEach(planet => {

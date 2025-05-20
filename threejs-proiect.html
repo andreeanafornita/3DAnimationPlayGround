@@ -427,19 +427,66 @@
     const planetData = [
       {
         radius: 6,
-        distance: 50,
+        distance: 25,
         texture: 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg',
         normal: 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_normal_2048.jpg',
-        hasAsteroids: false
+        hasAsteroids: false,
+        angle: 0
       },
       {
-        radius: 8,
-        distance: 80,
-        texture: '/assets/jupiter.jpg',
-        normal: null,
-        ring: true,
-        hasAsteroids: false
-      }
+       radius: 8,
+    distance: 40,
+    texture: '/assets/jupiter.jpg',
+    normal: null,
+    ring: true,
+    hasAsteroids: false,
+    angle: Math.PI * 0.4 
+      },
+      {
+    radius: 4,
+    distance: 55,
+    texture: '/assets/marss.jpg',
+    normal: null,
+    hasAsteroids: false,
+    color: 0xff9933, // Marte - roșiatic
+    angle: Math.PI * 0.8 // Poziție la 144 grade
+  },
+  {
+    radius: 9,
+    distance: 70,
+    texture: '/assets/saturnmap.jpg',
+    normal: null,
+    ring: true,
+    hasAsteroids: false,
+    color: 0xeedd99, // Saturn - galben
+    angle: Math.PI * 1.2 // Poziție la 216 grade
+  },
+  {
+    radius: 7,
+    distance: 85,
+    texture: '/assets/uranus.jpg',
+    normal: null,
+    hasAsteroids: true,
+    color: 0x99ccff, // Uranus - albastru deschis
+    angle: Math.PI * 1.6 // Poziție la 288 grade
+  },
+  {
+     radius: 7.5,
+    distance: 55,
+    texture: '/assets/neptun.jpg',
+    normal: null,
+    hasAsteroids: false,
+    color: 0x3366aa, // Neptun - albastru închis
+    angle: Math.PI * 0.2 // Poziție la 36 grade
+  },
+  { radius: 3,
+    distance: 100,
+    texture: '/assets/pluto.jpg',
+    normal: null,
+    hasAsteroids: false,
+    color: 0xaaaaaa, // Pluto - gri
+    angle: Math.PI * 0.6 // Poziție la 108 grade
+  }
     ];
 
     // Procedural Planet with Asteroids
@@ -530,7 +577,33 @@
       };
       scene.add(planet);
       planets.push(planet);
-
+ // Încărcăm textura pentru planetă dacă e specificată
+  if (data.texture) {
+    textureLoader.load(
+      data.texture,
+      (texture) => {
+        material.map = texture;
+        material.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        console.warn(`Failed to load texture: ${data.texture}.`);
+      }
+    );
+  }
+ if (data.normal) {
+    textureLoader.load(
+      data.normal,
+      (texture) => {
+        material.normalMap = texture;
+        material.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        console.warn(`Failed to load normal map: ${data.normal}.`);
+      }
+    );
+  }
       // Attach cloned PositionalAudio after buffer is set
       const checkCloneSound = setInterval(() => {
         if (planetSound.hasPlaybackControl && audioInitialized) {
@@ -585,7 +658,9 @@
         const moon = new THREE.Mesh(moonGeometry, moonMaterial);
         moon.userData = { orbitDistance: data.radius + 5 + i * 5, orbitSpeed: 0.05 / (i + 1), angle: Math.random() * Math.PI * 2 };
         planet.add(moon);
+        
       }
+      
     });
 
     // Asteroid Field (Instanced Meshes)
@@ -695,18 +770,23 @@
         if (audioInitialized && !clickSound.isPlaying) clickSound.play();
       }
     }
-
-    function onMouseMove(event) {
-      if (draggingPlanet) {
-        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-        raycaster.setFromCamera(mouse, camera);
-        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -draggingPlanet.position.z);
-        const intersect = new THREE.Vector3();
-        raycaster.ray.intersectPlane(plane, intersect);
-        draggingPlanet.userData.targetPosition.copy(intersect);
-      }
+function onMouseMove(event) {
+  if (draggingPlanet) {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -draggingPlanet.position.z);
+    const intersect = new THREE.Vector3();
+    raycaster.ray.intersectPlane(plane, intersect);
+    
+    // Check if targetPosition exists, create it if it doesn't
+    if (!draggingPlanet.userData.targetPosition) {
+      draggingPlanet.userData.targetPosition = new THREE.Vector3();
     }
+    
+    draggingPlanet.userData.targetPosition.copy(intersect);
+  }
+}
 
     function onMouseUp() {
       draggingPlanet = null;
@@ -900,32 +980,32 @@
       }
     });
 
-    saveStateButton.addEventListener('click', () => {
-      const state = {
-        planets: planets.map(p => ({
-          position: p.position.toArray(),
-          targetPosition: p.userData.targetPosition.toArray(),
-          distance: p.userData.distance,
-          hasAsteroids: p.userData.hasAsteroids,
-          asteroids: p.userData.asteroids.map(a => ({
-            position: a.position.toArray(),
-            orbitDistance: a.orbitDistance,
-            angle: a.angle,
-            orbitSpeed: a.orbitSpeed
-          }))
-        })),
-        spaceship: spaceship ? {
-          position: spaceship.position.toArray(),
-          velocity: spaceship.userData.velocity.toArray(),
-          shield: spaceship.userData.shield
-        } : null
-      };
-      localStorage.setItem('galaxyState', JSON.stringify(state));
-      document.getElementById('info').innerText = 'State saved!';
-      setTimeout(() => {
-        document.getElementById('info').innerText = 'Click to focus, drag planets to move. WASD for ship. Q/E/R for camera. Avoid asteroids!';
-      }, 2000);
-    });
+saveStateButton.addEventListener('click', () => {
+  const state = {
+    planets: planets.map(p => ({
+      position: p.position.toArray(),
+      targetPosition: p.userData.targetPosition ? p.userData.targetPosition.toArray() : p.position.toArray(),
+      distance: p.userData.distance || 0,
+      hasAsteroids: p.userData.hasAsteroids || false,
+      asteroids: (p.userData.asteroids || []).map(a => ({
+        position: a.position ? a.position.toArray() : [0, 0, 0],
+        orbitDistance: a.orbitDistance || 0,
+        angle: a.angle || 0,
+        orbitSpeed: a.orbitSpeed || 0
+      }))
+    })),
+    spaceship: spaceship ? {
+      position: spaceship.position.toArray(),
+      velocity: spaceship.userData.velocity ? spaceship.userData.velocity.toArray() : [0, 0, 0],
+      shield: spaceship.userData.shield || false
+    } : null
+  };
+  localStorage.setItem('galaxyState', JSON.stringify(state));
+  document.getElementById('info').innerText = 'State saved!';
+  setTimeout(() => {
+    document.getElementById('info').innerText = 'Click to focus, drag planets to move. WASD for ship. Q/E/R for camera. Avoid asteroids!';
+  }, 2000);
+});
 
     loadStateButton.addEventListener('click', () => {
       const state = JSON.parse(localStorage.getItem('galaxyState'));
@@ -986,53 +1066,165 @@
       }
     });
 
-    createPlanetButton.addEventListener('click', () => {
-      const radius = parseFloat(newPlanetRadiusInput.value);
-      const orbitDistance = parseFloat(newPlanetOrbitInput.value);
-      const planetGeometry = new THREE.SphereGeometry(radius, 64, 64);
-      const planetMaterial = new THREE.MeshStandardMaterial({
-        map: textureLoader.load(
-          'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg',
-          undefined,
-          undefined,
-          () => {
-            console.warn('Failed to load moon texture for new planet. Using fallback color.');
-            planetMaterial.color = new THREE.Color(0xaaaaaa);
-          }
-        ),
-        roughness: 0.8,
-        metalness: 0.1
-      });
-      const planet = new THREE.Mesh(planetGeometry, planetMaterial);
-      planet.position.set(orbitDistance, 0, 0);
-      planet.castShadow = true;
-      planet.receiveShadow = true;
-      planet.userData = { 
-        distance: orbitDistance, 
-        speed: 0.01, 
-        hasAsteroids: false, 
-        targetPosition: planet.position.clone(),
-        asteroids: []
-      };
-      scene.add(planet);
-      planets.push(planet);
-      
-      // Attach cloned PositionalAudio
-      const checkCloneSound = setInterval(() => {
-        if (planetSound.hasPlaybackControl && audioInitialized) {
-          const clonedSound = new THREE.PositionalAudio(listener);
-          clonedSound.setBuffer(planetSound.buffer || silentBuffer);
-          clonedSound.setLoop(true);
-          clonedSound.setVolume(0.3);
-          clonedSound.setRefDistance(20);
-          planet.add(clonedSound);
-          if (!clonedSound.isPlaying) clonedSound.play();
-          clearInterval(checkCloneSound);
-        }
-      }, 100);
-
-      updatePlanetSelect();
+// Locația: În event listener-ul pentru createPlanetButton (în jurul liniei ~700)
+createPlanetButton.addEventListener('click', () => {
+  const radius = parseFloat(newPlanetRadiusInput.value);
+  const orbitDistance = parseFloat(newPlanetOrbitInput.value);
+  const planetGeometry = new THREE.SphereGeometry(radius, 64, 64);
+  
+  // Generăm o culoare aleatorie pentru planetă
+  const hue = Math.random();
+  let planetColor;
+  
+  if (hue < 0.2) {
+    planetColor = new THREE.Color(0x77aacc); // Albastru
+  } else if (hue < 0.4) {
+    planetColor = new THREE.Color(0xcc9966); // Maro
+  } else if (hue < 0.6) {
+    planetColor = new THREE.Color(0xddaa88); // Bej
+  } else if (hue < 0.8) {
+    planetColor = new THREE.Color(0x99bb77); // Verde
+  } else {
+    planetColor = new THREE.Color(0xaa99cc); // Mov
+  }
+  
+  const planetMaterial = new THREE.MeshStandardMaterial({
+    color: planetColor,
+    roughness: 0.8,
+    metalness: 0.1
+  });
+  
+  // Încercăm să încărcăm o textură aleatorie
+  const textureChance = Math.random();
+  if (textureChance > 0.5) {
+    textureLoader.load(
+      'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg',
+      (texture) => {
+        planetMaterial.map = texture;
+        planetMaterial.needsUpdate = true;
+      },
+      undefined,
+      () => {
+        console.warn('Failed to load texture for new planet.');
+      }
+    );
+  }
+  
+  const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+  planet.position.set(orbitDistance, 0, 0);
+  planet.castShadow = true;
+  planet.receiveShadow = true;
+  
+  // Adăugăm un inel cu o probabilitate de 30%
+  const hasRing = Math.random() > 0.7;
+  
+  planet.userData = { 
+    distance: orbitDistance, 
+    speed: 0.01 * (Math.random() * 0.5 + 0.75), // Viteze variate
+    hasAsteroids: Math.random() > 0.8, // 20% șansă de a avea asteroizi 
+    targetPosition: planet.position.clone(),
+    asteroids: []
+  };
+  
+  scene.add(planet);
+  planets.push(planet);
+  
+  // Adăugăm un inel dacă este cazul
+  if (hasRing) {
+    const ringGeometry = new THREE.RingGeometry(radius + 2, radius + 5, 64);
+    const ringMaterial = new THREE.MeshStandardMaterial({
+      color: 0xbbaa88,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.7
     });
+    
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+    ring.rotation.x = Math.PI / 2;
+    planet.add(ring);
+  }
+  
+  // Adăugăm 0-2 luni
+  const moonCount = Math.floor(Math.random() * 3);
+  for (let i = 0; i < moonCount; i++) {
+    const moonRadius = radius * (0.2 + Math.random() * 0.3);
+    const moonGeometry = new THREE.SphereGeometry(moonRadius, 16, 16);
+    const moonMaterial = new THREE.MeshStandardMaterial({
+      color: 0xaaaaaa,
+      roughness: 0.9
+    });
+    
+    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+    moon.userData = { 
+      orbitDistance: radius + 5 + i * 5, 
+      orbitSpeed: 0.05 / (i + 1), 
+      angle: Math.random() * Math.PI * 2 
+    };
+    planet.add(moon);
+  }
+  
+  // Adăugăm asteroizi dacă planeta are hasAsteroids = true
+  if (planet.userData.hasAsteroids) {
+    const planetAsteroidCount = 5 + Math.floor(Math.random() * 10);
+    
+    for (let i = 0; i < planetAsteroidCount; i++) {
+      const orbitDistance = radius + 5 + Math.random() * 10;
+      const angle = Math.random() * Math.PI * 2;
+      const x = planet.position.x + orbitDistance * Math.cos(angle);
+      const y = planet.position.y + (Math.random() - 0.5) * 2;
+      const z = planet.position.z + orbitDistance * Math.sin(angle);
+      
+      planet.userData.asteroids.push({ 
+        position: new THREE.Vector3(x, y, z), 
+        orbitDistance, 
+        angle, 
+        orbitSpeed: 0.1 * (Math.random() + 0.5) 
+      });
+    }
+    
+    // Creăm mesh-ul pentru asteroizi
+    const planetAsteroidGeometry = new THREE.SphereGeometry(0.5, 8, 8);
+    const planetAsteroidMaterial = new THREE.MeshStandardMaterial({
+      color: 0x888888,
+      roughness: 0.9
+    });
+    
+    const planetAsteroidMesh = new THREE.InstancedMesh(
+      planetAsteroidGeometry, 
+      planetAsteroidMaterial, 
+      planet.userData.asteroids.length
+    );
+    
+    // Setăm pozițiile inițiale ale asteroizilor
+    planet.userData.asteroids.forEach((asteroid, i) => {
+      asteroidMatrix.setPosition(asteroid.position);
+      planetAsteroidMesh.setMatrixAt(i, asteroidMatrix);
+    });
+    
+    planetAsteroidMesh.castShadow = true;
+    planetAsteroidMesh.receiveShadow = true;
+    scene.add(planetAsteroidMesh);
+    
+    // Salvăm referința la mesh pentru actualizări
+    planet.userData.asteroidMesh = planetAsteroidMesh;
+  }
+  
+  // Attach cloned PositionalAudio
+  const checkCloneSound = setInterval(() => {
+    if (planetSound.hasPlaybackControl && audioInitialized) {
+      const clonedSound = new THREE.PositionalAudio(listener);
+      clonedSound.setBuffer(planetSound.buffer || silentBuffer);
+      clonedSound.setLoop(true);
+      clonedSound.setVolume(0.3);
+      clonedSound.setRefDistance(20);
+      planet.add(clonedSound);
+      if (!clonedSound.isPlaying) clonedSound.play();
+      clearInterval(checkCloneSound);
+    }
+  }, 100);
+
+  updatePlanetSelect();
+});
 
     planetSelect.addEventListener('change', () => {
       const index = parseInt(planetSelect.value);

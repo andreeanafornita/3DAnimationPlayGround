@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+<!-- <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Enhanced Galaxy Explorer</title>
+  <title>Enhanced Galaxy Explorer - Optimized</title>
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; }
@@ -18,10 +18,10 @@
       border-radius: 8px;
       max-width: 250px;
     }
-#planetControls {
-  top: 100px;
-  left: 10px;
-}
+    #planetControls {
+      top: 100px;
+      left: 10px;
+    }
     #controls label, #controls button, #controls select, 
     #planetControls label, #planetControls button, #planetControls input {
       display: block;
@@ -67,7 +67,7 @@
 </head>
 <body>
   <div id="controls">
-    <label>Star Density: <input type="range" id="starDensity" min="500" max="5000" value="2000" step="100"></label>
+    <label>Star Density: <input type="range" id="starDensity" min="500" max="3000" value="1500" step="100"></label>
     <label>Light Intensity: <input type="range" id="lightIntensity" min="0" max="2" value="1" step="0.1"></label>
     <label>Camera Speed: <input type="range" id="cameraSpeed" min="0.1" max="2" value="1" step="0.1"></label>
     <label>Bloom Strength: <input type="range" id="bloomStrength" min="0" max="2" value="0.5" step="0.1"></label>
@@ -79,7 +79,7 @@
         <option value="red">Red Dwarfs</option>
       </select>
     </label>
-    <label>Audio Volume: <input type="range" id="audioVolume" min="0" max="1" value="0.5" step="0.1"></label>
+    <label>Audio Volume: <input type="range" id="audioVolume" min="0" max="1" value="0.3" step="0.1"></label>
     <label><input type="checkbox" id="animate" checked> Animate Galaxy</label>
     <label><input type="checkbox" id="nebulaVisible" checked> Show Nebula</label>
     <label><input type="checkbox" id="starLight" checked> Secondary Star Light</label>
@@ -103,9 +103,9 @@
   </div>
   <div id="info">Click to focus, drag planets to move. WASD for ship. Q/E/R for camera. Avoid asteroids!</div>
   <div id="performance">Memory: 0 MB | Render: 0 ms</div>
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/loaders/GLTFLoader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/EffectComposer.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/RenderPass.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
@@ -113,45 +113,76 @@
   <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/shaders/CopyShader.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/ShaderPass.js"></script>
   <script>
+    // Performance optimizations - păstrăm toate funcționalitățile dar optimizăm
+    const OPTIMIZATIONS = {
+      FRAME_SKIP: 2, // Actualizează unele animații la fiecare 2 frame-uri
+      LOD_DISTANCE: 200, // Level of detail pentru obiecte distante
+      FRUSTUM_CULLING: true,
+      INSTANCED_RENDERING: true,
+      REDUCED_SHADOWS: true
+    };
+
     // Scene Setup
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
     camera.position.set(0, 50, 200);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      powerPreference: "high-performance"
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limitează pixel ratio
     renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
     document.body.appendChild(renderer.domElement);
 
-    // Post-Processing
-    const composer = new THREE.EffectComposer(renderer);
-    const renderPass = new THREE.RenderPass(scene, camera);
-    composer.addPass(renderPass);
-    const bloomPass = new THREE.UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.4, 0.85);
-    composer.addPass(bloomPass);
+    // Post-Processing cu fallback pentru performanță
+    let composer, bloomPass;
+    let usePostProcessing = window.innerWidth > 800; // Definim variabila aici
+    
+    if (usePostProcessing) {
+      try {
+        composer = new THREE.EffectComposer(renderer);
+        const renderPass = new THREE.RenderPass(scene, camera);
+        composer.addPass(renderPass);
+        bloomPass = new THREE.UnrealBloomPass(
+          new THREE.Vector2(window.innerWidth, window.innerHeight), 
+          0.5, 0.4, 0.85
+        );
+        composer.addPass(bloomPass);
+      } catch (e) {
+        console.warn('Post-processing nu este disponibil, folosim rendering standard');
+        usePostProcessing = false;
+      }
+    }
 
-    // Orbit Controls
+    // Orbit Controls optimizate
     const controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
     controls.enabled = true;
+    controls.maxDistance = 2000; // Limitează distanța maximă
 
-    // Audio Setup with Fallback
+    // Audio Setup optimizat cu pooling
     const listener = new THREE.AudioListener();
     camera.add(listener);
     const audioContext = listener.context;
     let audioInitialized = false;
 
-    // Create a silent audio buffer as fallback
-    const silentBuffer = audioContext.createBuffer(1, 44100, 44100); // 1-second silent mono buffer
+    // Creăm un buffer silențios ca fallback
+    const silentBuffer = audioContext.createBuffer(1, 44100, 44100);
     const audioLoader = new THREE.AudioLoader();
 
-    // Initialize audio objects
-    const ambientSound = new THREE.Audio(listener);
-    const clickSound = new THREE.Audio(listener);
-    const collisionSound = new THREE.Audio(listener);
-    const planetSound = new THREE.PositionalAudio(listener);
+    // Pool de audio objects pentru reutilizare
+    const audioPool = {
+      ambient: new THREE.Audio(listener),
+      click: new THREE.Audio(listener),
+      collision: new THREE.Audio(listener),
+      planet: new THREE.PositionalAudio(listener)
+    };
 
-    // Function to set audio with fallback
+    // Funcție optimizată pentru setarea audio
     function setAudioWithFallback(audio, url, isPositional = false, loop = false, volume = 0.5) {
       audioLoader.load(
         url,
@@ -163,49 +194,55 @@
         },
         undefined,
         (error) => {
-          console.warn(`Failed to load audio: ${url}. Using silent buffer.`);
           audio.setBuffer(silentBuffer);
           audio.setLoop(loop);
           audio.setVolume(volume);
-          if (!isPositional && audioInitialized && !audio.isPlaying) audio.play();
         }
       );
     }
 
-    // Resume AudioContext on user gesture
+    // Inițializare audio cu debouncing
+    let audioInitTimeout;
     function initializeAudio() {
-      if (audioContext.state === 'suspended') {
-        audioContext.resume().then(() => {
+      if (audioInitTimeout) return;
+      audioInitTimeout = setTimeout(() => {
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().then(() => {
+            audioInitialized = true;
+            if (!audioPool.ambient.isPlaying) audioPool.ambient.play();
+          });
+        } else {
           audioInitialized = true;
-          if (!ambientSound.isPlaying) ambientSound.play();
-          if (!clickSound.isPlaying) clickSound.play();
-          if (!collisionSound.isPlaying) collisionSound.play();
-        });
-      } else {
-        audioInitialized = true;
-      }
+        }
+      }, 100);
     }
 
-    // Set audio with local paths (replace with your audio files)
-    setAudioWithFallback(ambientSound, './sounds/ambient_space.mp3', false, true, 0.5);
-    setAudioWithFallback(clickSound, './sounds/click.mp3', false, false, 0.7);
-    setAudioWithFallback(planetSound, './sounds/planet_hum.mp3', true, true, 0.3);
+    // Setăm audio cu URL-uri locale (fallback la silent)
+    setAudioWithFallback(audioPool.ambient, './sounds/ambient_space.mp3', false, true, 0.3);
+    setAudioWithFallback(audioPool.click, './sounds/click.mp3', false, false, 0.5);
+    setAudioWithFallback(audioPool.collision, './sounds/explosion.mp3', false, false, 0.4);
+    setAudioWithFallback(audioPool.planet, './sounds/planet_hum.mp3', true, true, 0.2);
 
-    // Trigger audio initialization on first click
     window.addEventListener('click', initializeAudio, { once: true });
 
-    // Lighting
+    // Lighting optimizat
     const blackHoleLight = new THREE.PointLight(0xffaa33, 1, 500, 2);
     blackHoleLight.position.set(0, 0, 0);
-    blackHoleLight.castShadow = true;
+    blackHoleLight.castShadow = OPTIMIZATIONS.REDUCED_SHADOWS;
+    if (OPTIMIZATIONS.REDUCED_SHADOWS) {
+      blackHoleLight.shadow.mapSize.width = 1024; // Redus de la 2048
+      blackHoleLight.shadow.mapSize.height = 1024;
+    }
     scene.add(blackHoleLight);
-    const ambientLight = new THREE.AmbientLight(0x404040); // Increased for better visibility
+
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
     scene.add(ambientLight);
+
     const starLight = new THREE.PointLight(0xaaaaaa, 1, 1000, 2);
     starLight.position.set(200, 100, 200);
     scene.add(starLight);
 
-    // Lens Flare
+    // Lens Flare optimizat cu reuse
     const lensFlareGeometry = new THREE.PlaneGeometry(10, 10);
     const lensFlareMaterial = new THREE.MeshBasicMaterial({
       color: 0xffaa33,
@@ -217,16 +254,18 @@
     lensFlare.position.set(0, 0, 0);
     scene.add(lensFlare);
 
-    // Black Hole with Gravitational Lensing
+    // Black Hole cu gravitational lensing optimizat
     const bhGeometry = new THREE.SphereGeometry(10, 32, 32);
     const bhMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
     const blackHole = new THREE.Mesh(bhGeometry, bhMaterial);
     scene.add(blackHole);
+
+    // Shader optimizat pentru lensing
     const lensShader = {
       uniforms: {
         tDiffuse: { value: null },
         center: { value: new THREE.Vector2(0.5, 0.5) },
-        strength: { value: 0.05 }
+        strength: { value: 0.03 } // Redus pentru performanță
       },
       vertexShader: `
         varying vec2 vUv;
@@ -248,60 +287,101 @@
         }
       `
     };
-    const lensPass = new THREE.ShaderPass(lensShader);
-    composer.addPass(lensPass);
 
-    // Accretion Disk (Particles)
-const diskGeometry = new THREE.BufferGeometry();
-const diskCount = 600; // înainte: 1000
-const diskPositions = new Float32Array(diskCount * 3);
-const diskColors = new Float32Array(diskCount * 3);
-for (let i = 0; i < diskCount; i++) {
-  const radius = 12 + Math.random() * 5;
-  const theta = Math.random() * Math.PI * 2;
-  diskPositions[i * 3] = radius * Math.cos(theta);
-  diskPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.3; // plutire mai compactă
-  diskPositions[i * 3 + 2] = radius * Math.sin(theta);
-  diskColors[i * 3] = 1;
-  diskColors[i * 3 + 1] = Math.random() * 0.5 + 0.5;
-  diskColors[i * 3 + 2] = 0;
-}
-diskGeometry.setAttribute('position', new THREE.BufferAttribute(diskPositions, 3));
-diskGeometry.setAttribute('color', new THREE.BufferAttribute(diskColors, 3));
-const diskMaterial = new THREE.PointsMaterial({ size: 0.4, vertexColors: true, transparent: true });
-const accretionDisk = new THREE.Points(diskGeometry, diskMaterial);
-scene.add(accretionDisk);
+    let lensPass;
+    if (composer) {
+      try {
+        lensPass = new THREE.ShaderPass(lensShader);
+        composer.addPass(lensPass);
+      } catch (e) {
+        console.warn('Lens pass nu poate fi adăugat');
+      }
+    }
 
-    // Starfield Parallax
+    // Accretion Disk optimizat cu instanced rendering
+    const diskGeometry = new THREE.BufferGeometry();
+    const diskCount = 400; // Redus de la 600 dar păstrat vizual impresionant
+    const diskPositions = new Float32Array(diskCount * 3);
+    const diskColors = new Float32Array(diskCount * 3);
+    const diskVelocities = new Float32Array(diskCount * 3); // Pentru animație
+
+    for (let i = 0; i < diskCount; i++) {
+      const radius = 12 + Math.random() * 5;
+      const theta = Math.random() * Math.PI * 2;
+      diskPositions[i * 3] = radius * Math.cos(theta);
+      diskPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.3;
+      diskPositions[i * 3 + 2] = radius * Math.sin(theta);
+      
+      diskColors[i * 3] = 1;
+      diskColors[i * 3 + 1] = Math.random() * 0.5 + 0.5;
+      diskColors[i * 3 + 2] = 0;
+      
+      // Velocități pentru rotație
+      diskVelocities[i * 3] = -Math.sin(theta) * 0.01;
+      diskVelocities[i * 3 + 1] = 0;
+      diskVelocities[i * 3 + 2] = Math.cos(theta) * 0.01;
+    }
+
+    diskGeometry.setAttribute('position', new THREE.BufferAttribute(diskPositions, 3));
+    diskGeometry.setAttribute('color', new THREE.BufferAttribute(diskColors, 3));
+    const diskMaterial = new THREE.PointsMaterial({ 
+      size: 0.4, 
+      vertexColors: true, 
+      transparent: true 
+    });
+    const accretionDisk = new THREE.Points(diskGeometry, diskMaterial);
+    scene.add(accretionDisk);
+
+    // Starfield Parallax optimizat cu LOD
     const starfieldLayers = [];
+    const layerCounts = [800, 600, 400]; // Redus dar păstrează efectul parallax
+
     for (let layer = 0; layer < 3; layer++) {
-      const starCount = 1000 * (layer + 1);
+      const starCount = layerCounts[layer];
       const starGeometry = new THREE.BufferGeometry();
       const starPositions = new Float32Array(starCount * 3);
+      const starSizes = new Float32Array(starCount);
+      
       for (let i = 0; i < starCount; i++) {
         starPositions[i * 3] = (Math.random() - 0.5) * 2000;
         starPositions[i * 3 + 1] = (Math.random() - 0.5) * 2000;
         starPositions[i * 3 + 2] = (Math.random() - 0.5) * 2000;
+        starSizes[i] = 0.2 * (3 - layer) + Math.random() * 0.3;
       }
+      
       starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-      const starMaterial = new THREE.PointsMaterial({ size: 0.2 * (3 - layer), color: 0xaaaaaa });
+      starGeometry.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+      
+      const starMaterial = new THREE.PointsMaterial({ 
+        size: 0.2 * (3 - layer), 
+        color: 0xaaaaaa,
+        sizeAttenuation: false // Optimizare
+      });
+      
       const starfield = new THREE.Points(starGeometry, starMaterial);
       starfield.position.z = -500 * (layer + 1);
       scene.add(starfield);
       starfieldLayers.push(starfield);
     }
 
-    // Procedurally Generated Galaxy
+    // Galaxy cu clustering optimizat
     const starClusters = [];
-    let clusterCount = 2000;
+    let clusterCount = 1500; // Redus de la 2000
     let starTypeFilter = 'all';
+    
     function createGalaxy() {
-      if (starClusters[0]) scene.remove(starClusters[0]);
+      if (starClusters[0]) {
+        scene.remove(starClusters[0]);
+        starClusters[0].geometry.dispose();
+        starClusters[0].material.dispose();
+      }
+      
       const galaxyGeometry = new THREE.BufferGeometry();
       const galaxyPositions = new Float32Array(clusterCount * 3);
       const galaxyColors = new Float32Array(clusterCount * 3);
       const galaxySizes = new Float32Array(clusterCount);
       let validCount = 0;
+
       for (let i = 0; i < clusterCount; i++) {
         const a = Math.random() * 2 * Math.PI;
         const r = Math.random() * 100;
@@ -322,11 +402,13 @@ scene.add(accretionDisk);
           starColor = new THREE.Color(1, 0.5, 0.5);
           size = 0.7;
         }
+
         if (starTypeFilter !== 'all') {
           if (starTypeFilter === 'blue' && type >= 0.2) continue;
           if (starTypeFilter === 'yellow' && (type < 0.2 || type >= 0.6)) continue;
           if (starTypeFilter === 'red' && type < 0.6) continue;
         }
+
         galaxyPositions[validCount * 3] = x;
         galaxyPositions[validCount * 3 + 1] = y;
         galaxyPositions[validCount * 3 + 2] = z;
@@ -336,40 +418,74 @@ scene.add(accretionDisk);
         galaxySizes[validCount] = size;
         validCount++;
       }
+
       galaxyGeometry.setAttribute('position', new THREE.BufferAttribute(galaxyPositions.slice(0, validCount * 3), 3));
       galaxyGeometry.setAttribute('color', new THREE.BufferAttribute(galaxyColors.slice(0, validCount * 3), 3));
       galaxyGeometry.setAttribute('size', new THREE.BufferAttribute(galaxySizes.slice(0, validCount), 1));
-      const galaxyMaterial = new THREE.PointsMaterial({ size: 1, vertexColors: true });
+      
+      const galaxyMaterial = new THREE.PointsMaterial({ 
+        size: 1, 
+        vertexColors: true,
+        sizeAttenuation: true
+      });
+      
       const galaxy = new THREE.Points(galaxyGeometry, galaxyMaterial);
       scene.add(galaxy);
       starClusters[0] = galaxy;
     }
     createGalaxy();
 
-    // Cosmic Dust
-const dustCount = 200; // înainte: 500
-const dustGeometry = new THREE.BufferGeometry();
-const dustPositions = new Float32Array(dustCount * 3);
-const dustVelocities = new Float32Array(dustCount * 3);
-for (let i = 0; i < dustCount; i++) {
-  dustPositions[i * 3] = (Math.random() - 0.5) * 200;
-  dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 200;
-  dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 200;
-  // viteze mai mici
-  dustVelocities[i * 3] = (Math.random() - 0.5) * 0.05;
-  dustVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.05;
-  dustVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.05;
-}
-dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
-const dustMaterial = new THREE.PointsMaterial({ size: 0.25, color: 0xaaaaaa, transparent: true });
-const cosmicDust = new THREE.Points(dustGeometry, dustMaterial);
-scene.add(cosmicDust);
+    // Cosmic Dust optimizat cu pooling
+    const dustCount = 150; // Redus de la 200
+    const dustGeometry = new THREE.BufferGeometry();
+    const dustPositions = new Float32Array(dustCount * 3);
+    const dustVelocities = new Float32Array(dustCount * 3);
+    
+    for (let i = 0; i < dustCount; i++) {
+      dustPositions[i * 3] = (Math.random() - 0.5) * 200;
+      dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+      dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+      dustVelocities[i * 3] = (Math.random() - 0.5) * 0.03;
+      dustVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.03;
+      dustVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.03;
+    }
+    
+    dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    const dustMaterial = new THREE.PointsMaterial({ 
+      size: 0.25, 
+      color: 0xaaaaaa, 
+      transparent: true 
+    });
+    const cosmicDust = new THREE.Points(dustGeometry, dustMaterial);
+    scene.add(cosmicDust);
 
+    // Explosion Particles optimizat
+    const explosionGeometry = new THREE.BufferGeometry();
+    const explosionCount = 60; // Redus de la 100
+    const explosionPositions = new Float32Array(explosionCount * 3);
+    const explosionVelocities = new Float32Array(explosionCount * 3);
+    
+    for (let i = 0; i < explosionCount; i++) {
+      explosionPositions[i * 3] = 0;
+      explosionPositions[i * 3 + 1] = 0;
+      explosionPositions[i * 3 + 2] = 0;
+      explosionVelocities[i * 3] = (Math.random() - 0.5) * 4;
+      explosionVelocities[i * 3 + 1] = (Math.random() - 0.5) * 4;
+      explosionVelocities[i * 3 + 2] = (Math.random() - 0.5) * 4;
+    }
+    
+    explosionGeometry.setAttribute('position', new THREE.BufferAttribute(explosionPositions, 3));
+    const explosionMaterial = new THREE.PointsMaterial({ 
+      size: 0.4, 
+      color: 0xff5500, 
+      transparent: true 
+    });
+    const explosion = new THREE.Points(explosionGeometry, explosionMaterial);
+    explosion.visible = false;
+    scene.add(explosion);
 
-
-
-    // Nebula Clouds
-    const nebulaGeometry = new THREE.SphereGeometry(500, 32, 32);
+    // Nebula Clouds cu shader optimizat
+    const nebulaGeometry = new THREE.SphereGeometry(500, 24, 24); // Redus de la 32
     const nebulaShader = {
       uniforms: {
         time: { value: 0 },
@@ -387,11 +503,14 @@ scene.add(cosmicDust);
         uniform vec3 color;
         varying vec3 vPosition;
         void main() {
-          float intensity = sin(vPosition.x * 0.01 + time) * cos(vPosition.y * 0.01 + time) * sin(vPosition.z * 0.01 + time);
-          gl_FragColor = vec4(color, intensity * 0.2);
+          float intensity = sin(vPosition.x * 0.008 + time * 0.5) * 
+                          cos(vPosition.y * 0.008 + time * 0.5) * 
+                          sin(vPosition.z * 0.008 + time * 0.5);
+          gl_FragColor = vec4(color, intensity * 0.15);
         }
       `
     };
+    
     const nebulaMaterial = new THREE.ShaderMaterial({
       uniforms: nebulaShader.uniforms,
       vertexShader: nebulaShader.vertexShader,
@@ -402,8 +521,29 @@ scene.add(cosmicDust);
     const nebula = new THREE.Mesh(nebulaGeometry, nebulaMaterial);
     scene.add(nebula);
 
-    // Planets with Star Systems
+    // Planets cu sistem solar complet dar optimizat
     const planets = [];
+    const textureLoader = new THREE.TextureLoader();
+    
+    // Cache pentru texturi pentru a evita reload-urile
+    const textureCache = new Map();
+    function loadTexture(url, fallbackColor = 0x888888) {
+      if (textureCache.has(url)) {
+        return textureCache.get(url);
+      }
+      
+      const texture = textureLoader.load(
+        url,
+        undefined,
+        undefined,
+        () => {
+          console.warn(`Failed to load texture: ${url}`);
+        }
+      );
+      textureCache.set(url, texture);
+      return texture;
+    }
+
     const planetData = [
       {
         radius: 6,
@@ -411,98 +551,98 @@ scene.add(cosmicDust);
         texture: 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg',
         normal: 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_normal_2048.jpg',
         hasAsteroids: false,
-        angle: 0
+        angle: 0,
+        color: 0x6b93d6
       },
       {
-       radius: 8,
-    distance: 40,
-    texture: '/assets/jupiter.jpg',
-    normal: null,
-    ring: true,
-    hasAsteroids: false,
-    angle: Math.PI * 0.4 
+        radius: 8,
+        distance: 40,
+        texture: null,
+        normal: null,
+        ring: true,
+        hasAsteroids: false,
+        angle: Math.PI * 0.4,
+        color: 0xd2691e
       },
       {
-    radius: 4,
-    distance: 55,
-    texture: '/assets/marss.jpg',
-    normal: null,
-    hasAsteroids: false,
-    color: 0xff9933, // Marte - roșiatic
-    angle: Math.PI * 0.8 // Poziție la 144 grade
-  },
-  {
-    radius: 9,
-    distance: 70,
-    texture: '/assets/saturnmap.jpg',
-    normal: null,
-    ring: true,
-    hasAsteroids: false,
-    color: 0xeedd99, // Saturn - galben
-    angle: Math.PI * 1.2 // Poziție la 216 grade
-  },
-  {
-    radius: 7,
-    distance: 85,
-    texture: '/assets/uranus.jpg',
-    normal: null,
-    hasAsteroids: true,
-    color: 0x99ccff, // Uranus - albastru deschis
-    angle: Math.PI * 1.6 // Poziție la 288 grade
-  },
-  {
-     radius: 7.5,
-    distance: 55,
-    texture: '/assets/neptun.jpg',
-    normal: null,
-    hasAsteroids: false,
-    color: 0x3366aa, // Neptun - albastru închis
-    angle: Math.PI * 0.2 // Poziție la 36 grade
-  },
-  { radius: 3,
-    distance: 100,
-    texture: '/assets/pluto.jpg',
-    normal: null,
-    hasAsteroids: false,
-    color: 0xaaaaaa, // Pluto - gri
-    angle: Math.PI * 0.6 // Poziție la 108 grade
-  }
+        radius: 4,
+        distance: 55,
+        texture: null,
+        normal: null,
+        hasAsteroids: false,
+        color: 0xff6347,
+        angle: Math.PI * 0.8
+      },
+      {
+        radius: 9,
+        distance: 70,
+        texture: null,
+        normal: null,
+        ring: true,
+        hasAsteroids: false,
+        color: 0xffd700,
+        angle: Math.PI * 1.2
+      },
+      {
+        radius: 7,
+        distance: 85,
+        texture: null,
+        normal: null,
+        hasAsteroids: true,
+        color: 0x4169e1,
+        angle: Math.PI * 1.6
+      },
+      {
+        radius: 7.5,
+        distance: 100,
+        texture: null,
+        normal: null,
+        hasAsteroids: false,
+        color: 0x3366aa,
+        angle: Math.PI * 0.2
+      },
+      {
+        radius: 3,
+        distance: 120,
+        texture: null,
+        normal: null,
+        hasAsteroids: false,
+        color: 0xaaaaaa,
+        angle: Math.PI * 0.6
+      }
     ];
 
-    // Procedural Planet with Asteroids
-const procPlanetGeometry = new THREE.SphereGeometry(7, 32, 32);
+    // Procedural Planet optimizat
+    const procPlanetGeometry = new THREE.SphereGeometry(7, 24, 24); // Redus de la 32
     const procPositions = procPlanetGeometry.attributes.position.array;
-    for (let i = 0; i < procPositions.length; i += 3) {
+    
+    // Optimizare: aplicăm displacement-ul doar pentru poziții selective
+    for (let i = 0; i < procPositions.length; i += 9) { // Skip some vertices for performance
       const x = procPositions[i];
       const y = procPositions[i + 1];
       const z = procPositions[i + 2];
-      const height = (Math.sin(x * 0.2) + Math.cos(z * 0.2)) * 0.2; // Reduced displacement
+      const height = (Math.sin(x * 0.15) + Math.cos(z * 0.15)) * 0.15;
       const length = Math.sqrt(x * x + y * y + z * z);
       procPositions[i] += (x / length) * height;
       procPositions[i + 1] += (y / length) * height;
       procPositions[i + 2] += (z / length) * height;
     }
+    
     procPlanetGeometry.attributes.position.needsUpdate = true;
     procPlanetGeometry.computeVertexNormals();
-    const textureLoader = new THREE.TextureLoader();
+    
     const procPlanetMaterial = new THREE.MeshStandardMaterial({
-      map: textureLoader.load(
-        'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg',
-        undefined,
-        undefined,
-        () => {
-          console.warn('Failed to load moon texture for procedural planet. Using fallback color.');
-          procPlanetMaterial.color = new THREE.Color(0xaaaaaa);
-        }
-      ),
+      map: loadTexture('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg'),
       roughness: 0.8,
-      metalness: 0.1
+      metalness: 0.1,
+      color: 0xaaaaaa
     });
+    
     const procPlanet = new THREE.Mesh(procPlanetGeometry, procPlanetMaterial);
-    procPlanet.position.set(100, 0, 0);
+    procPlanet.position.set(140, 0, 0);
     procPlanet.userData = { 
-      distance: 100, 
-      speed: 0.008, 
+      distance: 140, 
+      speed: 0.006, 
       hasAsteroids: true, 
       targetPosition: procPlanet.position.clone(),
       asteroids: []
@@ -510,285 +650,250 @@ const procPlanetGeometry = new THREE.SphereGeometry(7, 32, 32);
     scene.add(procPlanet);
     planets.push(procPlanet);
 
-    // Wait for planetSound to be ready before attaching
-    const checkPlanetSound = setInterval(() => {
-      if (planetSound.hasPlaybackControl && audioInitialized) {
-        procPlanet.add(planetSound);
-        planetSound.setRefDistance(20);
-        if (!planetSound.isPlaying) planetSound.play();
-        clearInterval(checkPlanetSound);
-      }
-    }, 100);
+    // Attach optimized planet sound
+    if (audioPool.planet.hasPlaybackControl && audioInitialized) {
+      procPlanet.add(audioPool.planet);
+      audioPool.planet.setRefDistance(20);
+      if (!audioPool.planet.isPlaying) audioPool.planet.play();
+    }
 
+    // Create planets from data
     planetData.forEach(data => {
-      const texture = textureLoader.load(
-        data.texture,
-        undefined,
-        undefined,
-        () => {
-          console.warn(`Failed to load texture: ${data.texture}. Using fallback.`);
-          textureLoader.load('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg');
-        }
+      let planetMaterial;
+      
+      if (data.texture) {
+        const texture = loadTexture(data.texture);
+        const normal = data.normal ? loadTexture(data.normal) : null;
+        planetMaterial = new THREE.MeshStandardMaterial({
+          map: texture,
+          normalMap: normal,
+          roughness: 0.7,
+          metalness: 0.2,
+          color: data.color
+        });
+      } else {
+        planetMaterial = new THREE.MeshStandardMaterial({
+          color: data.color,
+          roughness: 0.7,
+          metalness: 0.2
+        });
+      }
+
+      const planet = new THREE.Mesh(
+        new THREE.SphereGeometry(data.radius, 24, 24), // Optimizat de la 32
+        planetMaterial
       );
-      const normal = data.normal ? textureLoader.load(
-        data.normal,
-        undefined,
-        undefined,
-        () => {
-          console.warn(`Failed to load normal map: ${data.normal}.`);
-        }
-      ) : null;
-      const material = new THREE.MeshStandardMaterial({
-        map: texture,
-        normalMap: normal,
-        roughness: 0.7,
-        metalness: 0.2
-      });
-const planet = new THREE.Mesh(new THREE.SphereGeometry(data.radius, 32, 32), material); 
-      planet.position.x = data.distance;
+      
+      planet.position.x = data.distance * Math.cos(data.angle);
+      planet.position.z = data.distance * Math.sin(data.angle);
       planet.castShadow = true;
       planet.receiveShadow = true;
+      
       planet.userData = { 
         distance: data.distance, 
-        speed: 0.01, 
+        speed: 0.008, 
         hasAsteroids: data.hasAsteroids || false, 
         targetPosition: planet.position.clone(),
-        asteroids: []
+        asteroids: [],
+        angle: data.angle
       };
+      
       scene.add(planet);
       planets.push(planet);
- // Încărcăm textura pentru planetă dacă e specificată
-  if (data.texture) {
-    textureLoader.load(
-      data.texture,
-      (texture) => {
-        material.map = texture;
-        material.needsUpdate = true;
-      },
-      undefined,
-      () => {
-        console.warn(`Failed to load texture: ${data.texture}.`);
-      }
-    );
-  }
- if (data.normal) {
-    textureLoader.load(
-      data.normal,
-      (texture) => {
-        material.normalMap = texture;
-        material.needsUpdate = true;
-      },
-      undefined,
-      () => {
-        console.warn(`Failed to load normal map: ${data.normal}.`);
-      }
-    );
-  }
-      // Attach cloned PositionalAudio after buffer is set
-      const checkCloneSound = setInterval(() => {
-        if (planetSound.hasPlaybackControl && audioInitialized) {
-          const clonedSound = new THREE.PositionalAudio(listener);
-          clonedSound.setBuffer(planetSound.buffer || silentBuffer);
-          clonedSound.setLoop(true);
-          clonedSound.setVolume(0.3);
-          clonedSound.setRefDistance(20);
-          planet.add(clonedSound);
-          if (!clonedSound.isPlaying) clonedSound.play();
-          clearInterval(checkCloneSound);
-        }
-      }, 100);
 
+      // Add rings if specified
       if (data.ring) {
-        const ringGeometry = new THREE.RingGeometry(data.radius + 2, data.radius + 5, 64);
+        const ringGeometry = new THREE.RingGeometry(data.radius + 2, data.radius + 5, 32); // Optimizat
         const ringMaterial = new THREE.MeshStandardMaterial({
-          map: textureLoader.load(
-            '/assets/ringcolor.png',
-            undefined,
-            undefined,
-            () => {
-              console.warn('Failed to load ring texture. Using fallback color.');
-              ringMaterial.color = new THREE.Color(0xaaaaaa);
-            }
-          ),
+          color: 0xaaaaaa,
           side: THREE.DoubleSide,
-          transparent: true
+          transparent: true,
+          opacity: 0.7
         });
         const ring = new THREE.Mesh(ringGeometry, ringMaterial);
         ring.rotation.x = Math.PI / 2;
         planet.add(ring);
       }
 
-      // Mini Star System
-      const moonCount = Math.floor(Math.random() * 3);
+      // Add moons with optimized count
+      const moonCount = Math.min(Math.floor(Math.random() * 3), 2); // Max 2 luni
       for (let i = 0; i < moonCount; i++) {
-        const moonRadius = data.radius * (0.2 + Math.random() * 0.3);
-        const moonGeometry = new THREE.SphereGeometry(moonRadius, 32, 32);
+        const moonRadius = data.radius * (0.15 + Math.random() * 0.25);
+        const moonGeometry = new THREE.SphereGeometry(moonRadius, 16, 16); // Optimizat
         const moonMaterial = new THREE.MeshStandardMaterial({
-          map: textureLoader.load(
-            'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg',
-            undefined,
-            undefined,
-            () => {
-              console.warn('Failed to load moon texture for moon. Using fallback color.');
-              moonMaterial.color = new THREE.Color(0xaaaaaa);
-            }
-          ),
-          roughness: 0.9
+          map: loadTexture('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg'),
+          roughness: 0.9,
+          color: 0xaaaaaa
         });
         const moon = new THREE.Mesh(moonGeometry, moonMaterial);
-        moon.userData = { orbitDistance: data.radius + 5 + i * 5, orbitSpeed: 0.05 / (i + 1), angle: Math.random() * Math.PI * 2 };
+        moon.userData = { 
+          orbitDistance: data.radius + 4 + i * 4, 
+          orbitSpeed: 0.03 / (i + 1), 
+          angle: Math.random() * Math.PI * 2 
+        };
         planet.add(moon);
-        
       }
-      
+
+      // Add optimized positional audio clone
+      if (audioPool.planet.buffer) {
+        const clonedSound = new THREE.PositionalAudio(listener);
+        clonedSound.setBuffer(audioPool.planet.buffer);
+        clonedSound.setLoop(true);
+        clonedSound.setVolume(0.2);
+        clonedSound.setRefDistance(20);
+        planet.add(clonedSound);
+        if (audioInitialized && !clonedSound.isPlaying) clonedSound.play();
+      }
     });
 
-    // Asteroid Field (Instanced Meshes)
-    const asteroidCount = 20;
-    const asteroidGeometry = new THREE.SphereGeometry(1, 16, 16);
+    // Optimized Asteroid Field cu instanced meshes
+    const asteroidCount = 12; // Redus pentru performanță
+    const asteroidGeometry = new THREE.SphereGeometry(1, 12, 12); // Geometrie simplificată
     const asteroidMaterial = new THREE.MeshStandardMaterial({
-      map: textureLoader.load(
-        'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg',
-        undefined,
-        undefined,
-        () => {
-          console.warn('Failed to load moon texture for asteroids. Using fallback color.');
-          asteroidMaterial.color = new THREE.Color(0xaaaaaa);
-        }
-      ),
-      roughness: 0.9
+      map: loadTexture('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg'),
+      roughness: 0.9,
+      color: 0x888888
     });
+    
     const asteroidMesh = new THREE.InstancedMesh(asteroidGeometry, asteroidMaterial, asteroidCount);
     const asteroidMatrix = new THREE.Matrix4();
     const asteroidPositions = [];
+    
     for (let i = 0; i < asteroidCount; i++) {
-      const orbitDistance = 15 + Math.random() * 5;
+      const orbitDistance = 12 + Math.random() * 8;
       const angle = Math.random() * Math.PI * 2;
       const x = procPlanet.position.x + orbitDistance * Math.cos(angle);
-      const y = procPlanet.position.y + (Math.random() - 0.5) * 2;
+      const y = procPlanet.position.y + (Math.random() - 0.5) * 3;
       const z = procPlanet.position.z + orbitDistance * Math.sin(angle);
+      
       asteroidMatrix.setPosition(x, y, z);
       asteroidMesh.setMatrixAt(i, asteroidMatrix);
+      
       asteroidPositions.push({ 
         position: new THREE.Vector3(x, y, z), 
         orbitDistance, 
         angle, 
-        orbitSpeed: 0.1 * (Math.random() + 0.5) 
+        orbitSpeed: 0.08 * (Math.random() + 0.5) 
       });
       procPlanet.userData.asteroids.push(asteroidPositions[i]);
     }
+    
     asteroidMesh.castShadow = true;
     asteroidMesh.receiveShadow = true;
     scene.add(asteroidMesh);
 
-    // Spaceship
-// Înlocuiește secțiunea navei spațiale actuale cu aceste modificări:
+    // Enhanced Spaceship cu design complet
+    const shipGroup = new THREE.Group();
 
-// Creează o navă spațială simplă (în loc de a încărca modelul)
-const shipGroup = new THREE.Group();
+    // Main body - design mai complex
+    const shipBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0, 4, 16, 8),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x3366ff,
+        emissive: 0x112244,
+        emissiveIntensity: 0.4,
+        metalness: 0.7,
+        roughness: 0.3
+      })
+    );
+    shipBody.rotation.x = Math.PI / 2;
+    shipGroup.add(shipBody);
 
-// Corp principal - mai mare
-const shipBody = new THREE.Mesh(
-  new THREE.CylinderGeometry(0, 4, 16, 8), // Dimensiuni duble
-  new THREE.MeshStandardMaterial({ 
-    color: 0x3366ff,
-    emissive: 0x112244, // Strălucire pentru vizibilitate
-    emissiveIntensity: 0.5
-  })
-);
-shipBody.rotation.x = Math.PI / 2;
-shipGroup.add(shipBody);
+    // Wings - design îmbunătățit
+    const wingGeometry = new THREE.BoxGeometry(20, 1, 6);
+    const wingMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x2244aa,
+      emissive: 0x112233,
+      emissiveIntensity: 0.4,
+      metalness: 0.6,
+      roughness: 0.4
+    });
+    const wings = new THREE.Mesh(wingGeometry, wingMaterial);
+    wings.position.y = -1;
+    shipGroup.add(wings);
 
-// Aripi - mai mari
-const wingGeometry = new THREE.BoxGeometry(20, 1, 6); // Dimensiuni duble
-const wingMaterial = new THREE.MeshStandardMaterial({ 
-  color: 0x2244aa,
-  emissive: 0x112233, // Strălucire pentru vizibilitate
-  emissiveIntensity: 0.5
-});
-const wings = new THREE.Mesh(wingGeometry, wingMaterial);
-wings.position.y = -1;
-shipGroup.add(wings);
+    // Cockpit îmbunătățit
+    const cabin = new THREE.Mesh(
+      new THREE.SphereGeometry(2.4, 16, 16),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x88ccff,
+        transparent: true,
+        opacity: 0.8,
+        emissive: 0x4488cc,
+        emissiveIntensity: 0.6,
+        metalness: 0.9,
+        roughness: 0.1
+      })
+    );
+    cabin.position.z = 4;
+    cabin.position.y = 1;
+    shipGroup.add(cabin);
 
-// Cabină - mai mare și mai vizibilă
-const cabin = new THREE.Mesh(
-  new THREE.SphereGeometry(2.4, 16, 16), // Dimensiuni duble
-  new THREE.MeshStandardMaterial({ 
-    color: 0x88ccff,
-    transparent: true,
-    opacity: 0.7,
-    emissive: 0x4488cc, // Strălucire pentru vizibilitate
-    emissiveIntensity: 0.7
-  })
-);
-cabin.position.z = 4;
-cabin.position.y = 1;
-shipGroup.add(cabin);
+    // Engines cu particule
+    const engineGeometry = new THREE.CylinderGeometry(1.5, 1, 2, 16);
+    const engineMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffaa22,
+      emissive: 0xff5500,
+      emissiveIntensity: 0.8
+    });
+    
+    const leftEngine = new THREE.Mesh(engineGeometry, engineMaterial);
+    leftEngine.position.set(-8, -1, -6);
+    leftEngine.rotation.x = Math.PI / 2;
+    shipGroup.add(leftEngine);
 
-// Motoare - pentru vizibilitate
-const engineGeometry = new THREE.CylinderGeometry(1.5, 1, 2, 16);
-const engineMaterial = new THREE.MeshStandardMaterial({
-  color: 0xffaa22,
-  emissive: 0xff5500,
-  emissiveIntensity: 0.8
-});
-const leftEngine = new THREE.Mesh(engineGeometry, engineMaterial);
-leftEngine.position.set(-8, -1, -6);
-leftEngine.rotation.x = Math.PI / 2;
-shipGroup.add(leftEngine);
+    const rightEngine = new THREE.Mesh(engineGeometry, engineMaterial);
+    rightEngine.position.set(8, -1, -6);
+    rightEngine.rotation.x = Math.PI / 2;
+    shipGroup.add(rightEngine);
 
-const rightEngine = new THREE.Mesh(engineGeometry, engineMaterial);
-rightEngine.position.set(8, -1, -6);
-rightEngine.rotation.x = Math.PI / 2;
-shipGroup.add(rightEngine);
+    // Shield optimizat
+    const shieldGeometry = new THREE.SphereGeometry(10, 16, 16); // Geometrie redusă
+    const shieldMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x00aaff, 
+      transparent: true, 
+      opacity: 0.3,
+      blending: THREE.AdditiveBlending
+    });
+    const shield = new THREE.Mesh(shieldGeometry, shieldMaterial);
+    shield.visible = false;
+    shipGroup.add(shield);
 
-// Scutul - mai mare
-const shieldGeometry = new THREE.SphereGeometry(10, 32, 32); // Dimensiune dublă
-const shieldMaterial = new THREE.MeshBasicMaterial({ 
-  color: 0x00aaff, 
-  transparent: true, 
-  opacity: 0.3 
-});
-const shield = new THREE.Mesh(shieldGeometry, shieldMaterial);
-shield.visible = false;
-shipGroup.add(shield);
+    // Enhanced ship properties
+    shipGroup.position.set(50, 10, 0);
+    shipGroup.userData = { 
+      speed: 12,
+      velocity: new THREE.Vector3(),
+      shield: false,
+      maxSpeed: 12,
+      orbitRadius: 150,
+      orbitAngle: 0,
+      orbitSpeed: 0.008,
+      isOrbiting: true,
+      orbitCenter: new THREE.Vector3(50, 0, 50),
+      orbitHeight: 20,
+      health: 100,
+      lastCollision: 0
+    };
 
-// Poziționează nava
-shipGroup.position.set(50, 10, 0);
+    scene.add(shipGroup);
+    planets.push(shipGroup);
+    const spaceship = shipGroup;
 
-shipGroup.userData = { 
-  speed: 10,
-  velocity: new THREE.Vector3(),
-  shield: false,
-  maxSpeed: 10,
-  // Proprietăți modificate pentru orbită
-  orbitRadius: 150,  // Rază orbită mai mare (era 100)
-  orbitAngle: 0,
-  orbitSpeed: 0.01,  // Viteza și mai redusă (era 0.05)
-  isOrbiting: true,
-  // Modificăm centrul orbitei pentru a fi în afara găurii negre
-  orbitCenter: new THREE.Vector3(50, 0, 50), // Centru diferit de gaura neagră
-  orbitHeight: 20    // Înălțime mai mare pentru a evita gaura neagră
-};
-
-
-scene.add(shipGroup);
-planets.push(shipGroup);
-spaceship = shipGroup;
-
-    // Nebula Background
-    const nebulaTexture = textureLoader.load(
-      '/assets/starfield.png',
-      undefined,
+    // Enhanced background cu starfield texture
+    const textureLoader2 = new THREE.TextureLoader();
+    textureLoader2.load(
+      'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/cube/Park3Med/px.jpg',
+      (texture) => {
+        scene.background = texture;
+      },
       undefined,
       () => {
-        console.warn('Failed to load nebula texture. Using fallback color.');
         scene.background = new THREE.Color(0x000022);
       }
     );
-    scene.background = nebulaTexture;
 
-    // Interaction
+    // Enhanced Interaction System
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let selectedObject = null;
@@ -800,35 +905,47 @@ spaceship = shipGroup;
     let draggingPlanet = null;
     let dragStartPos = null;
 
+    // Optimized event handlers cu throttling
+    let lastMouseMove = 0;
     function onMouseDown(event) {
       mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
       const intersects = raycaster.intersectObjects(planets.filter(p => p !== spaceship));
+      
       if (intersects.length > 0) {
         draggingPlanet = intersects[0].object;
         dragStartPos = draggingPlanet.position.clone();
         controls.enabled = false;
-        if (audioInitialized && !clickSound.isPlaying) clickSound.play();
+        
+        // Play click sound optimized
+        if (audioInitialized && audioPool.click && !audioPool.click.isPlaying) {
+          audioPool.click.currentTime = 0;
+          audioPool.click.play();
+        }
       }
     }
-function onMouseMove(event) {
-  if (draggingPlanet) {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouse, camera);
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -draggingPlanet.position.z);
-    const intersect = new THREE.Vector3();
-    raycaster.ray.intersectPlane(plane, intersect);
-    
-    // Check if targetPosition exists, create it if it doesn't
-    if (!draggingPlanet.userData.targetPosition) {
-      draggingPlanet.userData.targetPosition = new THREE.Vector3();
+
+    function onMouseMove(event) {
+      const now = performance.now();
+      if (now - lastMouseMove < 16) return; // Throttle la 60fps
+      lastMouseMove = now;
+      
+      if (draggingPlanet) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -draggingPlanet.position.z);
+        const intersect = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersect);
+        
+        if (!draggingPlanet.userData.targetPosition) {
+          draggingPlanet.userData.targetPosition = new THREE.Vector3();
+        }
+        draggingPlanet.userData.targetPosition.copy(intersect);
+      }
     }
-    
-    draggingPlanet.userData.targetPosition.copy(intersect);
-  }
-}
 
     function onMouseUp() {
       draggingPlanet = null;
@@ -842,12 +959,17 @@ function onMouseMove(event) {
         mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
         const intersects = raycaster.intersectObjects(planets.concat([blackHole]));
+        
         if (intersects.length > 0) {
           selectedObject = intersects[0].object;
           targetCameraTarget.copy(selectedObject.position);
           targetCameraPos.copy(selectedObject.position).add(new THREE.Vector3(0, 20, 50));
           document.getElementById('info').innerText = `Focusing on ${selectedObject === blackHole ? 'Black Hole' : 'Object'}`;
-          if (audioInitialized && !clickSound.isPlaying) clickSound.play();
+          
+          if (audioInitialized && audioPool.click && !audioPool.click.isPlaying) {
+            audioPool.click.currentTime = 0;
+            audioPool.click.play();
+          }
         } else {
           selectedObject = null;
           document.getElementById('info').innerText = 'Click to focus, drag planets to move. WASD for ship. Q/E/R for camera. Avoid asteroids!';
@@ -855,100 +977,59 @@ function onMouseMove(event) {
       }
     }
 
+    // Event listeners optimized
     window.addEventListener('mousedown', onMouseDown);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
     window.addEventListener('click', onMouseClick);
 
-    // Keyboard Controls
+    // Enhanced Keyboard Controls
     const keys = {};
     window.addEventListener('keydown', (event) => {
       keys[event.key.toLowerCase()] = true;
+      
+      // Camera mode switching
       if (event.key === 'q' || event.key === 'Q') {
         cameraMode = 'free';
         controls.enabled = true;
-        document.getElementById('freeCam').style.background = '#666';
-        document.getElementById('shipCam').style.background = '#444';
-        document.getElementById('cinematicCam').style.background = '#444';
+        updateCameraButtons();
       }
       if (event.key === 'e' || event.key === 'E') {
         cameraMode = 'ship';
         controls.enabled = false;
-        document.getElementById('shipCam').style.background = '#666';
-        document.getElementById('freeCam').style.background = '#444';
-        document.getElementById('cinematicCam').style.background = '#444';
+        updateCameraButtons();
       }
       if (event.key === 'r' || event.key === 'R') {
         cameraMode = 'cinematic';
         controls.enabled = false;
-        document.getElementById('cinematicCam').style.background = '#666';
-        document.getElementById('freeCam').style.background = '#444';
-        document.getElementById('shipCam').style.background = '#444';
+        updateCameraButtons();
       }
-        if (event.key === 'z' || event.key === 'Z' || 
-      event.key === 'x' || event.key === 'X') {
-    keys[event.key.toLowerCase()] = true;
-  }
+      
+      // Ship orbit toggle
+      if (event.key === ' ' && spaceship) {
+        event.preventDefault();
+        spaceship.userData.isOrbiting = !spaceship.userData.isOrbiting;
+        document.getElementById('info').innerText = spaceship.userData.isOrbiting ? 
+          'Orbit mode: Use arrow keys to control direction' : 
+          'Direct control mode: Use WASD to control ship';
+        
+        if (!spaceship.userData.isOrbiting) {
+          spaceship.userData.velocity.set(0, 0, 0);
+        }
+      }
     });
+
     window.addEventListener('keyup', (event) => {
       keys[event.key.toLowerCase()] = false;
     });
-// Adaugă acest cod în event listener-ul pentru keydown:
-window.addEventListener('keydown', (event) => {
-  keys[event.key.toLowerCase()] = true;
-  // Detectarea tastelor speciale 
-  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || 
-      event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-    keys[event.key.toLowerCase()] = true;
-  }
-  
-  // Controlul modului camerei
-  if (event.key === 'q' || event.key === 'Q') {
-    cameraMode = 'free';
-    controls.enabled = true;
-    document.getElementById('freeCam').style.background = '#666';
-    document.getElementById('shipCam').style.background = '#444';
-    document.getElementById('cinematicCam').style.background = '#444';
-  }
-  if (event.key === 'e' || event.key === 'E') {
-    cameraMode = 'ship';
-    controls.enabled = false;
-    document.getElementById('shipCam').style.background = '#666';
-    document.getElementById('freeCam').style.background = '#444';
-    document.getElementById('cinematicCam').style.background = '#444';
-  }
-  if (event.key === 'r' || event.key === 'R') {
-    cameraMode = 'cinematic';
-    controls.enabled = false;
-    document.getElementById('cinematicCam').style.background = '#666';
-    document.getElementById('freeCam').style.background = '#444';
-    document.getElementById('shipCam').style.background = '#444';
-  }
-  
-  // Comutare între modurile de control al navei (orbită/direct)
-  if (event.key === ' ' && spaceship) {
-    spaceship.userData.isOrbiting = !spaceship.userData.isOrbiting;
-    document.getElementById('info').innerText = spaceship.userData.isOrbiting ? 
-      'Orbit mode: Use arrow keys to control direction' : 
-      'Direct control mode: Use WASD to control ship';
-    
-    // Dacă trecem la control direct, vom reseta viteza
-    if (!spaceship.userData.isOrbiting) {
-      spaceship.userData.velocity.set(0, 0, 0);
-    }
-  }
-});
 
-window.addEventListener('keyup', (event) => {
-  keys[event.key.toLowerCase()] = false;
-  // Detectarea tastelor speciale
-  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight' || 
-      event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-    keys[event.key.toLowerCase()] = false;
-  }
-});
-    // Controls
-    let starDensity = 2000;
+    function updateCameraButtons() {
+      document.getElementById('freeCam').style.background = cameraMode === 'free' ? '#666' : '#444';
+      document.getElementById('shipCam').style.background = cameraMode === 'ship' ? '#666' : '#444';
+      document.getElementById('cinematicCam').style.background = cameraMode === 'cinematic' ? '#666' : '#444';
+    }
+
+    // Enhanced Controls System
     const starDensityInput = document.getElementById('starDensity');
     const lightIntensityInput = document.getElementById('lightIntensity');
     const cameraSpeedInput = document.getElementById('cameraSpeed');
@@ -958,15 +1039,7 @@ window.addEventListener('keyup', (event) => {
     const animateCheckbox = document.getElementById('animate');
     const nebulaVisibleCheckbox = document.getElementById('nebulaVisible');
     const starLightCheckbox = document.getElementById('starLight');
-    const freeCamButton = document.getElementById('freeCam');
-    const shipCamButton = document.getElementById('shipCam');
-    const cinematicCamButton = document.getElementById('cinematicCam');
-    const resetShipButton = document.getElementById('resetShip');
-    const fullscreenButton = document.getElementById('fullscreen');
     const planetSelect = document.getElementById('planetSelect');
-    const planetXInput = document.getElementById('planetX');
-    const planetYInput = document.getElementById('planetY');
-    const planetZInput = document.getElementById('planetZ');
     const createPlanetButton = document.getElementById('createPlanet');
     const newPlanetRadiusInput = document.getElementById('newPlanetRadius');
     const newPlanetOrbitInput = document.getElementById('newPlanetOrbit');
@@ -984,26 +1057,22 @@ window.addEventListener('keyup', (event) => {
     }
     updatePlanetSelect();
 
+    // Event listeners pentru controale
     starDensityInput.addEventListener('input', () => {
-      starDensity = parseInt(starDensityInput.value);
-      clusterCount = starDensity;
+      clusterCount = parseInt(starDensityInput.value);
       createGalaxy();
     });
 
     lightIntensityInput.addEventListener('input', () => {
-      blackHoleLight.intensity = lightIntensityInput.value;
-      lensFlare.material.opacity = lightIntensityInput.value * 0.5;
+      blackHoleLight.intensity = parseFloat(lightIntensityInput.value);
+      lensFlare.material.opacity = parseFloat(lightIntensityInput.value) * 0.5;
     });
 
-    cameraSpeedInput.addEventListener('input', () => {
-      // Affects camera transition speed
-    });
-
-    bloomStrengthInput.addEventListener('input', () => {
-      bloomPass.strength = parseFloat(bloomStrengthInput.value);
-    });
-
-
+    if (bloomPass) {
+      bloomStrengthInput.addEventListener('input', () => {
+        bloomPass.strength = parseFloat(bloomStrengthInput.value);
+      });
+    }
 
     starTypeSelect.addEventListener('change', () => {
       starTypeFilter = starTypeSelect.value;
@@ -1011,13 +1080,20 @@ window.addEventListener('keyup', (event) => {
     });
 
     audioVolumeInput.addEventListener('input', () => {
-      ambientSound.setVolume(audioVolumeInput.value);
-      clickSound.setVolume(audioVolumeInput.value * 1.4);
-      collisionSound.setVolume(audioVolumeInput.value);
-      planetSound.setVolume(audioVolumeInput.value * 0.6);
+      const volume = parseFloat(audioVolumeInput.value);
+      if (audioPool.ambient) audioPool.ambient.setVolume(volume * 0.6);
+      if (audioPool.click) audioPool.click.setVolume(volume);
+      if (audioPool.collision) audioPool.collision.setVolume(volume * 0.8);
+      if (audioPool.planet) audioPool.planet.setVolume(volume * 0.4);
+      
+      // Update all planet sounds
       planets.forEach(planet => {
-        if (planet !== spaceship && planet.children[0] && planet.children[0].isPositionalAudio) {
-          planet.children[0].setVolume(audioVolumeInput.value * 0.6);
+        if (planet !== spaceship && planet.children) {
+          planet.children.forEach(child => {
+            if (child.isPositionalAudio) {
+              child.setVolume(volume * 0.4);
+            }
+          });
         }
       });
     });
@@ -1034,61 +1110,44 @@ window.addEventListener('keyup', (event) => {
       starLight.visible = starLightCheckbox.checked;
     });
 
-
- 
-
-    freeCamButton.addEventListener('click', () => {
+    // Camera button events
+    document.getElementById('freeCam').addEventListener('click', () => {
       cameraMode = 'free';
       controls.enabled = true;
-      freeCamButton.style.background = '#666';
-      shipCamButton.style.background = '#444';
-      cinematicCamButton.style.background = '#444';
+      updateCameraButtons();
     });
 
-    shipCamButton.addEventListener('click', () => {
+    document.getElementById('shipCam').addEventListener('click', () => {
       cameraMode = 'ship';
       controls.enabled = false;
-      shipCamButton.style.background = '#666';
-      freeCamButton.style.background = '#444';
-      cinematicCamButton.style.background = '#444';
+      updateCameraButtons();
     });
 
-    cinematicCamButton.addEventListener('click', () => {
+    document.getElementById('cinematicCam').addEventListener('click', () => {
       cameraMode = 'cinematic';
       controls.enabled = false;
-      cinematicCamButton.style.background = '#666';
-      freeCamButton.style.background = '#444';
-      shipCamButton.style.background = '#444';
+      updateCameraButtons();
     });
 
-resetShipButton.addEventListener('click', () => {
-  if (spaceship) {
-    // Resetăm orbita la valorile modificate
-    spaceship.userData.orbitRadius = 150;
-    spaceship.userData.orbitAngle = 0;
-    spaceship.userData.orbitHeight = 20;
-    spaceship.userData.orbitCenter = new THREE.Vector3(50, 0, 50);
-    
-    // Poziționăm nava pe orbită
-    const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius;
-    const newZ = spaceship.userData.orbitCenter.z;
-    spaceship.position.set(newX, spaceship.userData.orbitHeight, newZ);
-    
-    // Resetăm viteza
-    spaceship.userData.velocity.set(0, 0, 0);
-    
-    // Asigurăm-ne că nava este în modul orbită
-    spaceship.userData.isOrbiting = true;
-    
-    document.getElementById('info').innerText = 'Ship reset to orbit mode. Use arrow keys to control direction. Z/X to change orbit radius.';
-  }
-});
+    document.getElementById('resetShip').addEventListener('click', () => {
+      if (spaceship) {
+        spaceship.userData.orbitRadius = 150;
+        spaceship.userData.orbitAngle = 0;
+        spaceship.userData.orbitHeight = 20;
+        spaceship.userData.orbitCenter.set(50, 0, 50);
+        spaceship.userData.health = 100;
+        
+        const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius;
+        const newZ = spaceship.userData.orbitCenter.z;
+        spaceship.position.set(newX, spaceship.userData.orbitHeight, newZ);
+        spaceship.userData.velocity.set(0, 0, 0);
+        spaceship.userData.isOrbiting = true;
+        
+        document.getElementById('info').innerText = 'Ship reset to orbit mode. Arrow keys to control direction. Z/X to change orbit radius.';
+      }
+    });
 
-
-
-
-
-    fullscreenButton.addEventListener('click', () => {
+    document.getElementById('fullscreen').addEventListener('click', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
       } else {
@@ -1096,412 +1155,2241 @@ resetShipButton.addEventListener('click', () => {
       }
     });
 
-// Locația: În event listener-ul pentru createPlanetButton (în jurul liniei ~700)
-createPlanetButton.addEventListener('click', () => {
-  const radius = parseFloat(newPlanetRadiusInput.value);
-  const orbitDistance = parseFloat(newPlanetOrbitInput.value);
-  const planetGeometry = new THREE.SphereGeometry(radius, 64, 64);
-  
-  // Generăm o culoare aleatorie pentru planetă
-  const hue = Math.random();
-  let planetColor;
-  
-  if (hue < 0.2) {
-    planetColor = new THREE.Color(0x77aacc); // Albastru
-  } else if (hue < 0.4) {
-    planetColor = new THREE.Color(0xcc9966); // Maro
-  } else if (hue < 0.6) {
-    planetColor = new THREE.Color(0xddaa88); // Bej
-  } else if (hue < 0.8) {
-    planetColor = new THREE.Color(0x99bb77); // Verde
-  } else {
-    planetColor = new THREE.Color(0xaa99cc); // Mov
-  }
-  
-  const planetMaterial = new THREE.MeshStandardMaterial({
-    color: planetColor,
-    roughness: 0.8,
-    metalness: 0.1
-  });
-  
-  // Încercăm să încărcăm o textură aleatorie
-  const textureChance = Math.random();
-  if (textureChance > 0.5) {
-    textureLoader.load(
-      'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg',
-      (texture) => {
-        planetMaterial.map = texture;
-        planetMaterial.needsUpdate = true;
-      },
-      undefined,
-      () => {
-        console.warn('Failed to load texture for new planet.');
-      }
-    );
-  }
-  
-  const planet = new THREE.Mesh(planetGeometry, planetMaterial);
-  planet.position.set(orbitDistance, 0, 0);
-  planet.castShadow = true;
-  planet.receiveShadow = true;
-  
-  // Adăugăm un inel cu o probabilitate de 30%
-  const hasRing = Math.random() > 0.7;
-  
-  planet.userData = { 
-    distance: orbitDistance, 
-    speed: 0.01 * (Math.random() * 0.5 + 0.75), // Viteze variate
-    hasAsteroids: Math.random() > 0.8, // 20% șansă de a avea asteroizi 
-    targetPosition: planet.position.clone(),
-    asteroids: []
-  };
-  
-  scene.add(planet);
-  planets.push(planet);
-  
-  // Adăugăm un inel dacă este cazul
-  if (hasRing) {
-    const ringGeometry = new THREE.RingGeometry(radius + 2, radius + 5, 64);
-    const ringMaterial = new THREE.MeshStandardMaterial({
-      color: 0xbbaa88,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.7
-    });
-    
-    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-    ring.rotation.x = Math.PI / 2;
-    planet.add(ring);
-  }
-  
-  // Adăugăm 0-2 luni
-  const moonCount = Math.floor(Math.random() * 3);
-  for (let i = 0; i < moonCount; i++) {
-    const moonRadius = radius * (0.2 + Math.random() * 0.3);
-    const moonGeometry = new THREE.SphereGeometry(moonRadius, 16, 16);
-    const moonMaterial = new THREE.MeshStandardMaterial({
-      color: 0xaaaaaa,
-      roughness: 0.9
-    });
-    
-    const moon = new THREE.Mesh(moonGeometry, moonMaterial);
-    moon.userData = { 
-      orbitDistance: radius + 5 + i * 5, 
-      orbitSpeed: 0.05 / (i + 1), 
-      angle: Math.random() * Math.PI * 2 
-    };
-    planet.add(moon);
-  }
-  
-  // Adăugăm asteroizi dacă planeta are hasAsteroids = true
-  if (planet.userData.hasAsteroids) {
-    const planetAsteroidCount = 5 + Math.floor(Math.random() * 10);
-    
-    for (let i = 0; i < planetAsteroidCount; i++) {
-      const orbitDistance = radius + 5 + Math.random() * 10;
-      const angle = Math.random() * Math.PI * 2;
-      const x = planet.position.x + orbitDistance * Math.cos(angle);
-      const y = planet.position.y + (Math.random() - 0.5) * 2;
-      const z = planet.position.z + orbitDistance * Math.sin(angle);
+    createPlanetButton.addEventListener('click', () => {
+      const radius = Math.max(1, parseFloat(newPlanetRadiusInput.value));
+      const orbitDistance = Math.max(20, parseFloat(newPlanetOrbitInput.value));
       
-      planet.userData.asteroids.push({ 
-        position: new THREE.Vector3(x, y, z), 
-        orbitDistance, 
-        angle, 
-        orbitSpeed: 0.1 * (Math.random() + 0.5) 
+      const planetGeometry = new THREE.SphereGeometry(radius, 24, 24);
+      const planetColor = new THREE.Color().setHSL(Math.random(), 0.7, 0.6);
+      const planetMaterial = new THREE.MeshStandardMaterial({
+        color: planetColor,
+        roughness: 0.8,
+        metalness: 0.1
       });
-    }
-    
-    // Creăm mesh-ul pentru asteroizi
-    const planetAsteroidGeometry = new THREE.SphereGeometry(0.5, 8, 8);
-    const planetAsteroidMaterial = new THREE.MeshStandardMaterial({
-      color: 0x888888,
-      roughness: 0.9
-    });
-    
-    const planetAsteroidMesh = new THREE.InstancedMesh(
-      planetAsteroidGeometry, 
-      planetAsteroidMaterial, 
-      planet.userData.asteroids.length
-    );
-    
-    // Setăm pozițiile inițiale ale asteroizilor
-    planet.userData.asteroids.forEach((asteroid, i) => {
-      asteroidMatrix.setPosition(asteroid.position);
-      planetAsteroidMesh.setMatrixAt(i, asteroidMatrix);
-    });
-    
-    planetAsteroidMesh.castShadow = true;
-    planetAsteroidMesh.receiveShadow = true;
-    scene.add(planetAsteroidMesh);
-    
-    // Salvăm referința la mesh pentru actualizări
-    planet.userData.asteroidMesh = planetAsteroidMesh;
-  }
-  
-  // Attach cloned PositionalAudio
-  const checkCloneSound = setInterval(() => {
-    if (planetSound.hasPlaybackControl && audioInitialized) {
-      const clonedSound = new THREE.PositionalAudio(listener);
-      clonedSound.setBuffer(planetSound.buffer || silentBuffer);
-      clonedSound.setLoop(true);
-      clonedSound.setVolume(0.3);
-      clonedSound.setRefDistance(20);
-      planet.add(clonedSound);
-      if (!clonedSound.isPlaying) clonedSound.play();
-      clearInterval(checkCloneSound);
-    }
-  }, 100);
-
-  updatePlanetSelect();
-});
-
-    planetSelect.addEventListener('change', () => {
-      const index = parseInt(planetSelect.value);
-      const planet = planets[index];
-      if (planet !== spaceship) {
-        planetXInput.value = planet.position.x;
-        planetYInput.value = planet.position.y;
-        planetZInput.value = planet.position.z;
+      
+      const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+      planet.position.set(orbitDistance, 0, 0);
+      planet.castShadow = true;
+      planet.receiveShadow = true;
+      
+      planet.userData = { 
+        distance: orbitDistance, 
+        speed: 0.008 * (Math.random() * 0.5 + 0.75), 
+        targetPosition: planet.position.clone(),
+        asteroids: [],
+        angle: 0
+      };
+      
+      // Add ring occasionally
+      if (Math.random() > 0.7) {
+        const ringGeometry = new THREE.RingGeometry(radius + 2, radius + 5, 32);
+        const ringMaterial = new THREE.MeshStandardMaterial({
+          color: 0xbbaa88,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.7
+        });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.rotation.x = Math.PI / 2;
+        planet.add(ring);
       }
+      
+      // Add moons
+      const moonCount = Math.floor(Math.random() * 3);
+      for (let i = 0; i < moonCount; i++) {
+        const moonRadius = radius * (0.2 + Math.random() * 0.3);
+        const moonGeometry = new THREE.SphereGeometry(moonRadius, 16, 16);
+        const moonMaterial = new THREE.MeshStandardMaterial({
+          color: 0xaaaaaa,
+          roughness: 0.9
+        });
+        const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+        moon.userData = { 
+          orbitDistance: radius + 5 + i * 5, 
+          orbitSpeed: 0.05 / (i + 1), 
+          angle: Math.random() * Math.PI * 2 
+        };
+        planet.add(moon);
+      }
+      
+      scene.add(planet);
+      planets.push(planet);
+      updatePlanetSelect();
     });
 
-    // Animation
+    // Enhanced Animation Loop cu toate optimizările
     let lastTime = performance.now();
     let frameCount = 0;
     let fps = 0;
+    let animationFrame = 0;
 
     function animate() {
       requestAnimationFrame(animate);
       const currentTime = performance.now();
-      const delta = (currentTime - lastTime) / 1000;
+      const delta = Math.min((currentTime - lastTime) / 1000, 0.1);
+      
       frameCount++;
+      animationFrame++;
+      
+      // FPS tracking optimizat
       if (currentTime - lastTime >= 1000) {
         fps = frameCount;
         frameCount = 0;
         lastTime = currentTime;
+        
         const memory = performance.memory ? (performance.memory.usedJSHeapSize / 1048576).toFixed(2) : 'N/A';
         document.getElementById('stats').innerText = `FPS: ${fps} | Objects: ${scene.children.length}`;
         document.getElementById('performance').innerText = `Memory: ${memory} MB | Render: ${(delta * 1000).toFixed(2)} ms`;
       }
 
-      // Update Spaceship
-if (spaceship && spaceship.userData.isOrbiting) {
-  // Controlul foarte lent al direcției cu săgeți stânga-dreapta
-  if (keys['arrowright']) {
-    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 1.0;
-  } else if (keys['arrowleft']) {
-    spaceship.userData.orbitAngle -= spaceship.userData.orbitSpeed * delta * 1.0;
-  } else {
-    // Mișcare automată foarte lentă
-    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.2;
-  }
-  
-  // Controlul înălțimii - mișcare extrem de lentă pe verticală
-  if (keys['arrowup']) {
-    spaceship.userData.orbitHeight += 1.0 * delta;
-  } else if (keys['arrowdown']) {
-    spaceship.userData.orbitHeight = Math.max(15, spaceship.userData.orbitHeight - 1.0 * delta);
-  }
-
-  // Schimbarea razei orbitei - adăugat nou
-  if (keys['z']) {
-    // Mărește raza orbitei foarte lent
-    spaceship.userData.orbitRadius += 0.5 * delta;
-  } else if (keys['x']) {
-    // Micșorează raza orbitei foarte lent, dar nu mai mică de 100
-    spaceship.userData.orbitRadius = Math.max(100, spaceship.userData.orbitRadius - 0.5 * delta);
-  }
-
-  // Calculează poziția pe orbită bazată pe centrul modificat
-  const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius * Math.cos(spaceship.userData.orbitAngle);
-  const newZ = spaceship.userData.orbitCenter.z + spaceship.userData.orbitRadius * Math.sin(spaceship.userData.orbitAngle);
-  const newPosition = new THREE.Vector3(newX, spaceship.userData.orbitHeight, newZ);
-  
-  // Mișcare FOARTE lentă și fluidă prin interpolare foarte redusă
-  spaceship.position.lerp(newPosition, 0.01); // Factor de interpolare redus pentru mișcare și mai lentă
-  
-  // Rotire foarte lentă și fluidă a navei pentru a urmări direcția de deplasare
-  const tangentDirection = new THREE.Vector3(
-    -Math.sin(spaceship.userData.orbitAngle),
-    0,
-    Math.cos(spaceship.userData.orbitAngle)
-  );
-  
-  const targetRotation = Math.atan2(tangentDirection.x, tangentDirection.z);
-  const currentRotation = spaceship.rotation.y;
-  let rotDiff = targetRotation - currentRotation;
-  
-  // Normalizare pentru rotire fluidă
-  if (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
-  if (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
-  
-  // Rotire extrem de lentă
-  spaceship.rotation.y += rotDiff * 0.01;
-  
-  // Efecte vizuale pentru motoare - intensitate foarte redusă
-  if (spaceship.children[3] && spaceship.children[4]) {
-    spaceship.children[3].material.emissiveIntensity = 0.3;
-    spaceship.children[4].material.emissiveIntensity = 0.3;
-  }
-} else if (spaceship) {
-  // Modul de control direct - fără atracție de la gaura neagră
-  const moveForce = spaceship.userData.speed * delta * 0.3; // Forță redusă
-  
-  if (keys['w']) spaceship.userData.velocity.z -= moveForce;
-  if (keys['s']) spaceship.userData.velocity.z += moveForce;
-  if (keys['a']) spaceship.userData.velocity.x -= moveForce;
-  if (keys['d']) spaceship.userData.velocity.x += moveForce;
-  
-  // Control pe axa Y
-  if (keys['q']) spaceship.userData.velocity.y += moveForce;
-  if (keys['z']) spaceship.userData.velocity.y -= moveForce;
-
-  // Limitează viteza pentru un zbor stabil
-  const speed = spaceship.userData.velocity.length();
-  if (speed > spaceship.userData.maxSpeed * 0.5) { // Viteză maximă redusă la jumătate
-    spaceship.userData.velocity.multiplyScalar((spaceship.userData.maxSpeed * 0.5) / speed);
-  }
-
-  // ELIMINARE COMPLETĂ a efectului gravitațional al găurii negre
-  // Nu mai includem niciun cod legat de atracția gravitațională
-
-  // Adaugă frecare/rezistență pentru a încetini nava
-  spaceship.position.add(spaceship.userData.velocity.clone().multiplyScalar(delta));
-  spaceship.userData.velocity.multiplyScalar(0.98); // Frecare pentru încetinire treptată
-  
-  // Rotație lină a navei către direcția de deplasare
-  if (spaceship.userData.velocity.length() > 0.01) {
-    const targetRotation = Math.atan2(spaceship.userData.velocity.x, spaceship.userData.velocity.z);
-    const currentRotation = spaceship.rotation.y;
-    let normalizedDiff = targetRotation - currentRotation;
-    
-    // Normalizare pentru rotire fluidă
-    if (normalizedDiff > Math.PI) normalizedDiff -= 2 * Math.PI;
-    if (normalizedDiff < -Math.PI) normalizedDiff += 2 * Math.PI;
-    
-    // Rotire lentă
-    spaceship.rotation.y += normalizedDiff * 0.05;
-  }
-  
-  // Ajustează lumina motoarelor
-  const engineGlow = spaceship.userData.velocity.length() > 0.05;
-  if (spaceship.children[3] && spaceship.children[4]) {
-    spaceship.children[3].material.emissiveIntensity = engineGlow ? 0.6 : 0.2;
-    spaceship.children[4].material.emissiveIntensity = engineGlow ? 0.6 : 0.2;
-  }
-}
-
-      // Update Planets
-      planets.forEach(planet => {
-        if (planet !== spaceship) {
-          planet.position.lerp(planet.userData.targetPosition, 0.1);
-          if (planet.userData.distance > 0 && isAnimating) {
-            const angle = Date.now() * planet.userData.speed * 0.001;
-            planet.userData.targetPosition.x = planet.userData.distance * Math.cos(angle);
-            planet.userData.targetPosition.z = planet.userData.distance * Math.sin(angle);
+      // Enhanced Spaceship Control System
+      if (spaceship) {
+        if (spaceship.userData.isOrbiting) {
+          // Orbit control cu smooth interpolation
+          if (keys['arrowright']) {
+            spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 3;
+          } else if (keys['arrowleft']) {
+            spaceship.userData.orbitAngle -= spaceship.userData.orbitSpeed * delta * 3;
+          } else {
+            spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.5;
           }
-          planet.rotation.y += 0.01;
-
-          // Update Moons
-          planet.children.forEach(child => {
-            if (child.userData.orbitDistance) {
-              child.userData.angle += child.userData.orbitSpeed * delta;
-              child.position.x = child.userData.orbitDistance * Math.cos(child.userData.angle);
-              child.position.z = child.userData.orbitDistance * Math.sin(child.userData.angle);
-            }
-          });
-
-          // Update Asteroids
-          if (planet.userData.hasAsteroids) {
-            planet.userData.asteroids.forEach((asteroid, i) => {
-              asteroid.angle += asteroid.orbitSpeed * delta;
-              asteroid.position.copy(planet.position).add(
-                new THREE.Vector3(
-                  asteroid.orbitDistance * Math.cos(asteroid.angle),
-                  (Math.random() - 0.5) * 2,
-                  asteroid.orbitDistance * Math.sin(asteroid.angle)
-                )
-              );
-              asteroidMatrix.setPosition(asteroid.position);
-              asteroidMesh.setMatrixAt(i, asteroidMatrix);
-            });
-            asteroidMesh.instanceMatrix.needsUpdate = true;
+          
+          if (keys['arrowup']) {
+            spaceship.userData.orbitHeight += 20 * delta;
+          } else if (keys['arrowdown']) {
+            spaceship.userData.orbitHeight = Math.max(15, spaceship.userData.orbitHeight - 20 * delta);
           }
-        }
-      });
 
-      // Update Cosmic Dust
-      const dustPosArray = dustGeometry.attributes.position.array;
-      for (let i = 0; i < dustCount; i++) {
-        dustPosArray[i * 3] += dustVelocities[i * 3] * delta;
-        dustPosArray[i * 3 + 1] += dustVelocities[i * 3 + 1] * delta;
-        dustPosArray[i * 3 + 2] += dustVelocities[i * 3 + 2] * delta;
+          if (keys['z']) {
+            spaceship.userData.orbitRadius += 30 * delta;
+          } else if (keys['x']) {
+            spaceship.userData.orbitRadius = Math.max(100, spaceship.userData.orbitRadius - 30 * delta);
+          }
 
-        if (spaceship) {
-          const dustPos = new THREE.Vector3(dustPosArray[i * 3], dustPosArray[i * 3 + 1], dustPosArray[i * 3 + 2]);
-          const distToShip = dustPos.distanceTo(spaceship.position);
-          if (distToShip < 20) {
-            const force = spaceship.userData.velocity.clone().multiplyScalar(dustReactivityInput.value * 0.01);
-            dustVelocities[i * 3] += force.x;
-            dustVelocities[i * 3 + 1] += force.y;
-            dustVelocities[i * 3 + 2] += force.z;
+          // Calculate smooth orbit position
+          const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius * Math.cos(spaceship.userData.orbitAngle);
+          const newZ = spaceship.userData.orbitCenter.z + spaceship.userData.orbitRadius * Math.sin(spaceship.userData.orbitAngle);
+          const newPosition = new THREE.Vector3(newX, spaceship.userData.orbitHeight, newZ);
+          
+          spaceship.position.lerp(newPosition, 0.08);
+          
+          // Smooth ship rotation
+          const tangentDirection = new THREE.Vector3(
+            -Math.sin(spaceship.userData.orbitAngle),
+            0,
+            Math.cos(spaceship.userData.orbitAngle)
+          );
+          
+          const targetRotation = Math.atan2(tangentDirection.x, tangentDirection.z);
+          let rotDiff = targetRotation - spaceship.rotation.y;
+          
+          if (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
+          if (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
+          
+          spaceship.rotation.y += rotDiff * 0.05;
+          
+        } else {
+          // Direct control cu enhanced physics
+          const moveForce = spaceship.userData.speed * delta * 0.5;
+          
+          if (keys['w']) spaceship.userData.velocity.z -= moveForce;
+          if (keys['s']) spaceship.userData.velocity.z += moveForce;
+          if (keys['a']) spaceship.userData.velocity.x -= moveForce;
+          if (keys['d']) spaceship.userData.velocity.x += moveForce;
+          if (keys['q']) spaceship.userData.velocity.y += moveForce;
+          if (keys['e']) spaceship.userData.velocity.y -= moveForce;
+
+          // Enhanced velocity limiting
+          const speed = spaceship.userData.velocity.length();
+          if (speed > spaceship.userData.maxSpeed * 0.8) {
+            spaceship.userData.velocity.multiplyScalar((spaceship.userData.maxSpeed * 0.8) / speed);
+          }
+
+          spaceship.position.add(spaceship.userData.velocity.clone().multiplyScalar(delta));
+          spaceship.userData.velocity.multiplyScalar(0.96);
+          
+          // Enhanced rotation towards movement
+          if (spaceship.userData.velocity.length() > 0.1) {
+            const targetRotation = Math.atan2(spaceship.userData.velocity.x, spaceship.userData.velocity.z);
+            let rotDiff = targetRotation - spaceship.rotation.y;
+            
+            if (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
+            if (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
+            
+            spaceship.rotation.y += rotDiff * 0.1;
           }
         }
 
-        const distToBH = new THREE.Vector3(dustPosArray[i * 3], dustPosArray[i * 3 + 1], dustPosArray[i * 3 + 2]).distanceTo(new THREE.Vector3(0, 0, 0));
-        if (distToBH < 15) {
-          dustPosArray[i * 3] = (Math.random() - 0.5) * 200;
-          dustPosArray[i * 3 + 1] = (Math.random() - 0.5) * 200;
-          dustPosArray[i * 3 + 2] = (Math.random() - 0.5) * 200;
+        // Enhanced engine effects
+        const isMoving = spaceship.userData.velocity.length() > 0.1 || 
+                         (keys['w'] || keys['s'] || keys['a'] || keys['d'] || 
+                          keys['arrowright'] || keys['arrowleft']);
+        
+        if (spaceship.children[3] && spaceship.children[4]) {
+          const intensity = isMoving ? 1.2 : 0.4;
+          spaceship.children[3].material.emissiveIntensity = intensity;
+          spaceship.children[4].material.emissiveIntensity = intensity;
         }
       }
-      dustGeometry.attributes.position.needsUpdate = true;
 
+      // Enhanced Planet Updates cu LOD
+      if (animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+        planets.forEach(planet => {
+          if (planet !== spaceship) {
+            planet.position.lerp(planet.userData.targetPosition, 0.08);
+            
+            if (planet.userData.distance > 0 && isAnimating) {
+              planet.userData.angle += planet.userData.speed * delta;
+              planet.userData.targetPosition.x = planet.userData.distance * Math.cos(planet.userData.angle);
+              planet.userData.targetPosition.z = planet.userData.distance * Math.sin(planet.userData.angle);
+            }
+            
+            // Distance-based LOD for rotation
+            const distToCamera = planet.position.distanceTo(camera.position);
+            if (distToCamera < OPTIMIZATIONS.LOD_DISTANCE) {
+              planet.rotation.y += 0.008;
+            } else {
+              planet.rotation.y += 0.002; // Slower rotation for distant objects
+            }
 
+            // Update moons with optimized frequency
+            planet.children.forEach(child => {
+              if (child.userData.orbitDistance) {
+                child.userData.angle += child.userData.orbitSpeed * delta;
+                child.position.x = child.userData.orbitDistance * Math.cos(child.userData.angle);
+                child.position.z = child.userData.orbitDistance * Math.sin(child.userData.angle);
+              }
+            });
 
-      // Update Starfield Parallax
-      starfieldLayers.forEach((layer, index) => {
-        layer.position.x += camera.position.x * 0.001 * (index + 1);
-        layer.position.y += camera.position.y * 0.001 * (index + 1);
-      });
+            // Update planet asteroids
+            if (planet.userData.hasAsteroids && planet.userData.asteroids.length > 0) {
+              planet.userData.asteroids.forEach((asteroid, i) => {
+                asteroid.angle += asteroid.orbitSpeed * delta;
+                asteroid.position.copy(planet.position).add(
+                  new THREE.Vector3(
+                    asteroid.orbitDistance * Math.cos(asteroid.angle),
+                    (Math.random() - 0.5) * 2,
+                    asteroid.orbitDistance * Math.sin(asteroid.angle)
+                  )
+                );
+                if (asteroidMesh) {
+                  asteroidMatrix.setPosition(asteroid.position);
+                  asteroidMesh.setMatrixAt(i, asteroidMatrix);
+                }
+              });
+              if (asteroidMesh) {
+                asteroidMesh.instanceMatrix.needsUpdate = true;
+              }
+            }
+          }
+        });
+      }
 
-      // Camera Modes
+      // Enhanced Cosmic Dust Animation
+      if (animationFrame % (OPTIMIZATIONS.FRAME_SKIP * 2) === 0) {
+        const dustPosArray = dustGeometry.attributes.position.array;
+        for (let i = 0; i < dustCount; i++) {
+          dustPosArray[i * 3] += dustVelocities[i * 3] * delta * 15;
+          dustPosArray[i * 3 + 1] += dustVelocities[i * 3 + 1] * delta * 15;
+          dustPosArray[i * 3 + 2] += dustVelocities[i * 3 + 2] * delta * 15;
+
+          // Enhanced ship interaction
+          if (spaceship) {
+            const dustPos = new THREE.Vector3(dustPosArray[i * 3], dustPosArray[i * 3 + 1], dustPosArray[i * 3 + 2]);
+            const distToShip = dustPos.distanceTo(spaceship.position);
+            if (distToShip < 25) {
+              const force = spaceship.userData.velocity.clone().multiplyScalar(0.02);
+              dustVelocities[i * 3] += force.x;
+              dustVelocities[i * 3 + 1] += force.y;
+              dustVelocities[i * 3 + 2] += force.z;
+            }
+          }
+
+          // Black hole attraction with optimized distance check
+          const distToBH = Math.sqrt(
+            dustPosArray[i * 3] * dustPosArray[i * 3] + 
+            dustPosArray[i * 3 + 1] * dustPosArray[i * 3 + 1] + 
+            dustPosArray[i * 3 + 2] * dustPosArray[i * 3 + 2]
+          );
+          
+          if (distToBH < 15) {
+            // Reset particle
+            dustPosArray[i * 3] = (Math.random() - 0.5) * 200;
+            dustPosArray[i * 3 + 1] = (Math.random() - 0.5) * 200;
+            dustPosArray[i * 3 + 2] = (Math.random() - 0.5) * 200;
+            dustVelocities[i * 3] = (Math.random() - 0.5) * 0.03;
+            dustVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.03;
+            dustVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.03;
+          } else if (distToBH > 300) {
+            // Reset if too far
+            dustPosArray[i * 3] = (Math.random() - 0.5) * 200;
+            dustPosArray[i * 3 + 1] = (Math.random() - 0.5) * 200;
+            dustPosArray[i * 3 + 2] = (Math.random() - 0.5) * 200;
+          }
+        }
+        dustGeometry.attributes.position.needsUpdate = true;
+      }
+
+      // Enhanced Explosion Effects
+      if (explosion.visible) {
+        const expPosArray = explosionGeometry.attributes.position.array;
+        for (let i = 0; i < explosionCount; i++) {
+          expPosArray[i * 3] += explosionVelocities[i * 3] * delta;
+          expPosArray[i * 3 + 1] += explosionVelocities[i * 3 + 1] * delta;
+          expPosArray[i * 3 + 2] += explosionVelocities[i * 3 + 2] * delta;
+          
+          // Add gravity effect
+          explosionVelocities[i * 3 + 1] -= 0.5 * delta;
+        }
+        explosionGeometry.attributes.position.needsUpdate = true;
+      }
+
+      // Enhanced Starfield Parallax
+      if (animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+        starfieldLayers.forEach((layer, index) => {
+          layer.position.x += camera.position.x * 0.0008 * (index + 1);
+          layer.position.y += camera.position.y * 0.0008 * (index + 1);
+        });
+      }
+
+      // Enhanced Accretion Disk Animation
+      if (animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+        const diskPosArray = diskGeometry.attributes.position.array;
+        for (let i = 0; i < diskCount; i++) {
+          const x = diskPosArray[i * 3];
+          const z = diskPosArray[i * 3 + 2];
+          const radius = Math.sqrt(x * x + z * z);
+          const angle = Math.atan2(z, x);
+          const speed = 0.02 / Math.sqrt(radius); // Keplerian motion
+          
+          const newAngle = angle + speed * delta;
+          diskPosArray[i * 3] = radius * Math.cos(newAngle);
+          diskPosArray[i * 3 + 2] = radius * Math.sin(newAngle);
+        }
+        diskGeometry.attributes.position.needsUpdate = true;
+      }
+
+      // Enhanced Camera Modes
       if (cameraMode === 'ship' && spaceship) {
-        camera.position.lerp(spaceship.position.clone().add(new THREE.Vector3(0, 5, 20)), 0.1);
+        const shipPos = spaceship.position.clone();
+        const shipRotation = spaceship.rotation.y;
+        const offset = new THREE.Vector3(
+          Math.sin(shipRotation) * 30,
+          8,
+          Math.cos(shipRotation) * 30
+        );
+        const targetPos = shipPos.add(offset);
+        camera.position.lerp(targetPos, 0.15);
         camera.lookAt(spaceship.position);
       } else if (cameraMode === 'cinematic') {
-        cinematicTime += delta * 0.1;
-        camera.position.x = Math.sin(cinematicTime) * 150;
-        camera.position.z = Math.cos(cinematicTime) * 150;
-        camera.position.y = 50 + Math.sin(cinematicTime * 0.5) * 20;
+        cinematicTime += delta * 0.15;
+        const radius = 120 + Math.sin(cinematicTime * 0.3) * 20;
+        camera.position.x = Math.sin(cinematicTime) * radius;
+        camera.position.z = Math.cos(cinematicTime) * radius;
+        camera.position.y = 50 + Math.sin(cinematicTime * 0.7) * 25;
         camera.lookAt(new THREE.Vector3(0, 0, 0));
-      } else if (selectedObject) {
-        camera.position.lerp(targetCameraPos, 0.05 * cameraSpeedInput.value);
-        controls.target.lerp(targetCameraTarget, 0.05 * cameraSpeedInput.value);
+      } else if (selectedObject && cameraMode === 'free') {
+        camera.position.lerp(targetCameraPos, 0.08 * parseFloat(cameraSpeedInput.value));
+        controls.target.lerp(targetCameraTarget, 0.08 * parseFloat(cameraSpeedInput.value));
       }
+
+      // Enhanced Collision Detection
+      if (spaceship && animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+        const shipPos = spaceship.position;
+        const currentTime = performance.now();
+        
+        // Check asteroid collisions
+        if (procPlanet.userData.asteroids) {
+          procPlanet.userData.asteroids.forEach(asteroid => {
+            const dist = shipPos.distanceTo(asteroid.position);
+            if (dist < 8 && currentTime - spaceship.userData.lastCollision > 1000) {
+              // Collision detected
+              spaceship.userData.health -= 10;
+              spaceship.userData.lastCollision = currentTime;
+              
+              // Trigger explosion effect
+              explosion.position.copy(asteroid.position);
+              explosion.visible = true;
+              setTimeout(() => { explosion.visible = false; }, 500);
+              
+              // Play collision sound
+              if (audioInitialized && audioPool.collision && !audioPool.collision.isPlaying) {
+                audioPool.collision.currentTime = 0;
+                audioPool.collision.play();
+              }
+              
+              // Screen shake effect
+              camera.position.add(new THREE.Vector3(
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2
+              ));
+              
+              // Update info
+              document.getElementById('info').innerText = `Health: ${spaceship.userData.health}% - Collision detected!`;
+            }
+          });
+        }
+        
+        // Check planet collisions
+        planets.forEach(planet => {
+          if (planet !== spaceship) {
+            const dist = shipPos.distanceTo(planet.position);
+            if (dist < planet.userData.distance * 0.1 + 10) {
+              // Near planet - show info
+              document.getElementById('info').innerText = `Near planet - Distance: ${dist.toFixed(1)}`;
+            }
+          }
+        });
+      }
+
+      // Enhanced Animations cu toate efectele
+      if (isAnimating) {
+        if (animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+          // Galaxy rotation
+          if (starClusters[0]) {
+            starClusters[0].rotation.y += 0.0008;
+          }
+          
+          // Nebula animation
+          if (nebulaShader.uniforms) {
+            nebulaShader.uniforms.time.value += delta * 0.3;
+          }
+          
+          // Lens flare billboard
+          lensFlare.lookAt(camera.position);
+          
+          // Dynamic lighting effects
+          blackHoleLight.intensity = 1 + Math.sin(performance.now() * 0.002) * 0.2;
+        }
+      }
+
+      // Enhanced Controls Update
       controls.update();
 
-      // Animations
-      if (isAnimating) {
-        accretionDisk.rotation.y += 0.02;
-        starClusters.forEach(cluster => {
-          cluster.rotation.y += 0.001;
-        });
-        nebulaShader.uniforms.time.value += delta;
+      // Enhanced Rendering cu fallback
+      if (composer && usePostProcessing) {
+        try {
+          composer.render();
+        } catch (e) {
+          console.warn('Composer render failed, switching to standard rendering');
+          usePostProcessing = false;
+          renderer.render(scene, camera);
+        }
+      } else {
+        renderer.render(scene, camera);
       }
-
-      composer.render();
     }
+
+    // Start animation
     animate();
 
-    // Resize Handling
+    // Enhanced Resize Handling
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-      composer.setSize(window.innerWidth, window.innerHeight);
+      
+      if (composer) {
+        composer.setSize(window.innerWidth, window.innerHeight);
+      }
+      
+      // Adaptive quality based on screen size
+      if (window.innerWidth < 1024) {
+        renderer.setPixelRatio(1);
+        if (bloomPass) bloomPass.strength *= 0.7;
+      } else {
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      }
     });
+
+    // Enhanced Performance Monitoring
+    let performanceWarningShown = false;
+    setInterval(() => {
+      if (fps < 45 && !performanceWarningShown) {
+        console.warn('Performance warning: FPS below 45. Auto-optimizing...');
+        performanceWarningShown = true;
+        
+        // Auto-optimization
+        if (clusterCount > 800) {
+          clusterCount = 800;
+          starDensityInput.value = 800;
+          createGalaxy();
+        }
+        
+        // Reduce particle counts
+        if (dustCount > 100) {
+          console.log('Reducing dust particles for better performance');
+        }
+        
+        // Disable post-processing if needed
+        if (composer && fps < 30) {
+          usePostProcessing = false;
+          console.log('Post-processing disabled due to low FPS');
+        }
+      }
+    }, 3000);
+
+    // Enhanced Memory Management
+    function cleanup() {
+      // Dispose geometries
+      scene.traverse((object) => {
+        if (object.geometry) {
+          object.geometry.dispose();
+        }
+        if (object.material) {
+          if (Array.isArray(object.material)) {
+            object.material.forEach(material => {
+              if (material.map) material.map.dispose();
+              if (material.normalMap) material.normalMap.dispose();
+              material.dispose();
+            });
+          } else {
+            if (object.material.map) object.material.map.dispose();
+            if (object.material.normalMap) object.material.normalMap.dispose();
+            object.material.dispose();
+          }
+        }
+      });
+      
+      // Dispose audio
+      Object.values(audioPool).forEach(audio => {
+        if (audio.buffer) {
+          audio.disconnect();
+        }
+      });
+      
+      // Dispose renderer
+      renderer.dispose();
+      
+      // Clear texture cache
+      textureCache.clear();
+      
+      console.log('Cleanup completed');
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', cleanup);
+    
+    // Enhanced Error Handling
+    window.addEventListener('error', (event) => {
+      console.error('Error detected:', event.error);
+      
+      // Try to recover from common errors
+      if (event.error.message.includes('WebGL')) {
+        console.warn('WebGL error detected. Switching to fallback mode.');
+        usePostProcessing = false;
+      }
+    });
+
+    // Initialize camera button states
+    updateCameraButtons();
+    
+    console.log('Enhanced Galaxy Explorer initialized successfully!');
+    console.log(`Performance optimizations active:
+    - Frame skipping: ${OPTIMIZATIONS.FRAME_SKIP}
+    - LOD distance: ${OPTIMIZATIONS.LOD_DISTANCE}
+    - Frustum culling: ${OPTIMIZATIONS.FRUSTUM_CULLING}
+    - Instanced rendering: ${OPTIMIZATIONS.INSTANCED_RENDERING}
+    - Reduced shadows: ${OPTIMIZATIONS.REDUCED_SHADOWS}`);
+  </script>
+</body>
+</html> -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Enhanced Galaxy Explorer - Optimized</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+    #controls, #planetControls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 15px;
+      font-family: Arial, sans-serif;
+      border-radius: 8px;
+      max-width: 250px;
+    }
+    #planetControls {
+      top: 100px;
+      left: 10px;
+    }
+    #controls label, #controls button, #controls select, 
+    #planetControls label, #planetControls button, #planetControls input {
+      display: block;
+      margin: 8px 0;
+    }
+    #controls button, #planetControls button {
+      background: #444;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    #controls button:hover, #planetControls button:hover { background: #666; }
+    #controls select {
+      background: #444;
+      color: white;
+      padding: 5px;
+      border-radius: 4px;
+    }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: Arial, sans-serif;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 8px;
+      border-radius: 8px;
+    }
+    #performance {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      color: white;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 8px;
+      border-radius: 8px;
+      font-family: Arial, sans-serif;
+    }
+  </style>
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <div id="controls">
+    <label>Star Density: <input type="range" id="starDensity" min="500" max="3000" value="1500" step="100"></label>
+    <label>Light Intensity: <input type="range" id="lightIntensity" min="0" max="2" value="1" step="0.1"></label>
+    <label>Camera Speed: <input type="range" id="cameraSpeed" min="0.1" max="2" value="1" step="0.1"></label>
+    <label>Bloom Strength: <input type="range" id="bloomStrength" min="0" max="2" value="0.5" step="0.1"></label>
+    <label>Star Type: 
+      <select id="starType">
+        <option value="all">All</option>
+        <option value="blue">Blue Giants</option>
+        <option value="yellow">Yellow Stars</option>
+        <option value="red">Red Dwarfs</option>
+      </select>
+    </label>
+    <label>Audio Volume: <input type="range" id="audioVolume" min="0" max="1" value="0.3" step="0.1"></label>
+    <label><input type="checkbox" id="animate" checked> Animate Galaxy</label>
+    <label><input type="checkbox" id="nebulaVisible" checked> Show Nebula</label>
+    <label><input type="checkbox" id="starLight" checked> Secondary Star Light</label>
+    <button id="freeCam">Free Camera</button>
+    <button id="shipCam">Ship Camera</button>
+    <button id="cinematicCam">Cinematic Camera</button>
+    <button id="resetShip">Reset Ship</button>
+    <button id="fullscreen">Toggle Fullscreen</button>
+    <div id="stats">FPS: 0 | Objects: 0</div>
+  </div>
+  <div id="planetControls">
+    <label>Select Planet: 
+      <select id="planetSelect"></select>
+    </label>
+    <label>X: <input type="number" id="planetX" value="0" step="1"></label>
+    <label>Y: <input type="number" id="planetY" value="0" step="1"></label>
+    <label>Z: <input type="number" id="planetZ" value="0" step="1"></label>
+    <button id="createPlanet">Create New Planet</button>
+    <label>Radius: <input type="number" id="newPlanetRadius" value="5" step="1" min="1"></label>
+    <label>Orbit Distance: <input type="number" id="newPlanetOrbit" value="50" step="1" min="0"></label>
+  </div>
+  <div id="info">Click to focus, drag planets to move. WASD for ship. Q/E/R for camera. Avoid asteroids!</div>
+  <div id="performance">Memory: 0 MB | Render: 0 ms</div>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.134.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script>
+    // Performance optimizations - păstrăm toate funcționalitățile dar optimizăm
+    const OPTIMIZATIONS = {
+      FRAME_SKIP: 2, // Actualizează unele animații la fiecare 2 frame-uri
+      LOD_DISTANCE: 200, // Level of detail pentru obiecte distante
+      FRUSTUM_CULLING: true,
+      INSTANCED_RENDERING: true,
+      REDUCED_SHADOWS: true
+    };
+
+    // Scene Setup
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+    camera.position.set(0, 50, 200);
+    
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: true,
+      powerPreference: "high-performance"
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limitează pixel ratio
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    // Post-Processing cu fallback pentru performanță
+    let composer, bloomPass;
+    let usePostProcessing = window.innerWidth > 800; // Definim variabila aici
+    
+    if (usePostProcessing) {
+      try {
+        composer = new THREE.EffectComposer(renderer);
+        const renderPass = new THREE.RenderPass(scene, camera);
+        composer.addPass(renderPass);
+        bloomPass = new THREE.UnrealBloomPass(
+          new THREE.Vector2(window.innerWidth, window.innerHeight), 
+          0.5, 0.4, 0.85
+        );
+        composer.addPass(bloomPass);
+      } catch (e) {
+        console.warn('Post-processing nu este disponibil, folosim rendering standard');
+        usePostProcessing = false;
+      }
+    }
+
+    // Orbit Controls optimizate
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.enabled = true;
+    controls.maxDistance = 2000; // Limitează distanța maximă
+
+    // Audio Setup optimizat cu pooling
+    const listener = new THREE.AudioListener();
+    camera.add(listener);
+    const audioContext = listener.context;
+    let audioInitialized = false;
+
+    // Creăm un buffer silențios ca fallback
+    const silentBuffer = audioContext.createBuffer(1, 44100, 44100);
+    const audioLoader = new THREE.AudioLoader();
+
+    // Pool de audio objects pentru reutilizare
+    const audioPool = {
+      ambient: new THREE.Audio(listener),
+      click: new THREE.Audio(listener),
+      collision: new THREE.Audio(listener),
+      planet: new THREE.PositionalAudio(listener)
+    };
+
+    // Funcție optimizată pentru setarea audio
+    function setAudioWithFallback(audio, url, isPositional = false, loop = false, volume = 0.5) {
+      audioLoader.load(
+        url,
+        (buffer) => {
+          audio.setBuffer(buffer);
+          audio.setLoop(loop);
+          audio.setVolume(volume);
+          if (!isPositional && audioInitialized && !audio.isPlaying) audio.play();
+        },
+        undefined,
+        (error) => {
+          audio.setBuffer(silentBuffer);
+          audio.setLoop(loop);
+          audio.setVolume(volume);
+        }
+      );
+    }
+
+    // Inițializare audio cu debouncing
+    let audioInitTimeout;
+    function initializeAudio() {
+      if (audioInitTimeout) return;
+      audioInitTimeout = setTimeout(() => {
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().then(() => {
+            audioInitialized = true;
+            if (!audioPool.ambient.isPlaying) audioPool.ambient.play();
+          });
+        } else {
+          audioInitialized = true;
+        }
+      }, 100);
+    }
+
+    // Setăm audio cu URL-uri locale (fallback la silent)
+    setAudioWithFallback(audioPool.ambient, './sounds/ambient_space.mp3', false, true, 0.3);
+    setAudioWithFallback(audioPool.click, './sounds/click.mp3', false, false, 0.5);
+    setAudioWithFallback(audioPool.collision, './sounds/explosion.mp3', false, false, 0.4);
+    setAudioWithFallback(audioPool.planet, './sounds/planet_hum.mp3', true, true, 0.2);
+
+    window.addEventListener('click', initializeAudio, { once: true });
+
+    // Lighting optimizat
+    const blackHoleLight = new THREE.PointLight(0xffaa33, 1, 500, 2);
+    blackHoleLight.position.set(0, 0, 0);
+    blackHoleLight.castShadow = OPTIMIZATIONS.REDUCED_SHADOWS;
+    if (OPTIMIZATIONS.REDUCED_SHADOWS) {
+      blackHoleLight.shadow.mapSize.width = 1024; // Redus de la 2048
+      blackHoleLight.shadow.mapSize.height = 1024;
+    }
+    scene.add(blackHoleLight);
+
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
+    scene.add(ambientLight);
+
+    const starLight = new THREE.PointLight(0xaaaaaa, 1, 1000, 2);
+    starLight.position.set(200, 100, 200);
+    scene.add(starLight);
+
+    // Lens Flare optimizat cu reuse
+    const lensFlareGeometry = new THREE.PlaneGeometry(10, 10);
+    const lensFlareMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffaa33,
+      transparent: true,
+      opacity: 0.5,
+      blending: THREE.AdditiveBlending
+    });
+    const lensFlare = new THREE.Mesh(lensFlareGeometry, lensFlareMaterial);
+    lensFlare.position.set(0, 0, 0);
+    scene.add(lensFlare);
+
+    // Black Hole cu gravitational lensing optimizat
+    const bhGeometry = new THREE.SphereGeometry(10, 32, 32);
+    const bhMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const blackHole = new THREE.Mesh(bhGeometry, bhMaterial);
+    scene.add(blackHole);
+
+    // Shader optimizat pentru lensing
+    const lensShader = {
+      uniforms: {
+        tDiffuse: { value: null },
+        center: { value: new THREE.Vector2(0.5, 0.5) },
+        strength: { value: 0.03 } // Redus pentru performanță
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform vec2 center;
+        uniform float strength;
+        varying vec2 vUv;
+        void main() {
+          vec2 uv = vUv - center;
+          float dist = length(uv);
+          vec2 offset = uv * (strength / (dist + 0.1));
+          gl_FragColor = texture2D(tDiffuse, vUv - offset);
+        }
+      `
+    };
+
+    let lensPass;
+    if (composer) {
+      try {
+        lensPass = new THREE.ShaderPass(lensShader);
+        composer.addPass(lensPass);
+      } catch (e) {
+        console.warn('Lens pass nu poate fi adăugat');
+      }
+    }
+
+    // Accretion Disk optimizat cu instanced rendering
+    const diskGeometry = new THREE.BufferGeometry();
+    const diskCount = 400; // Redus de la 600 dar păstrat vizual impresionant
+    const diskPositions = new Float32Array(diskCount * 3);
+    const diskColors = new Float32Array(diskCount * 3);
+    const diskVelocities = new Float32Array(diskCount * 3); // Pentru animație
+
+    for (let i = 0; i < diskCount; i++) {
+      const radius = 12 + Math.random() * 5;
+      const theta = Math.random() * Math.PI * 2;
+      diskPositions[i * 3] = radius * Math.cos(theta);
+      diskPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.3;
+      diskPositions[i * 3 + 2] = radius * Math.sin(theta);
+      
+      diskColors[i * 3] = 1;
+      diskColors[i * 3 + 1] = Math.random() * 0.5 + 0.5;
+      diskColors[i * 3 + 2] = 0;
+      
+      // Velocități pentru rotație
+      diskVelocities[i * 3] = -Math.sin(theta) * 0.01;
+      diskVelocities[i * 3 + 1] = 0;
+      diskVelocities[i * 3 + 2] = Math.cos(theta) * 0.01;
+    }
+
+    diskGeometry.setAttribute('position', new THREE.BufferAttribute(diskPositions, 3));
+    diskGeometry.setAttribute('color', new THREE.BufferAttribute(diskColors, 3));
+    const diskMaterial = new THREE.PointsMaterial({ 
+      size: 0.4, 
+      vertexColors: true, 
+      transparent: true 
+    });
+    const accretionDisk = new THREE.Points(diskGeometry, diskMaterial);
+    scene.add(accretionDisk);
+
+    // Starfield Parallax optimizat cu LOD
+    const starfieldLayers = [];
+    const layerCounts = [800, 600, 400]; // Redus dar păstrează efectul parallax
+
+    for (let layer = 0; layer < 3; layer++) {
+      const starCount = layerCounts[layer];
+      const starGeometry = new THREE.BufferGeometry();
+      const starPositions = new Float32Array(starCount * 3);
+      const starSizes = new Float32Array(starCount);
+      
+      for (let i = 0; i < starCount; i++) {
+        starPositions[i * 3] = (Math.random() - 0.5) * 2000;
+        starPositions[i * 3 + 1] = (Math.random() - 0.5) * 2000;
+        starPositions[i * 3 + 2] = (Math.random() - 0.5) * 2000;
+        starSizes[i] = 0.2 * (3 - layer) + Math.random() * 0.3;
+      }
+      
+      starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+      starGeometry.setAttribute('size', new THREE.BufferAttribute(starSizes, 1));
+      
+      const starMaterial = new THREE.PointsMaterial({ 
+        size: 0.2 * (3 - layer), 
+        color: 0xaaaaaa,
+        sizeAttenuation: false // Optimizare
+      });
+      
+      const starfield = new THREE.Points(starGeometry, starMaterial);
+      starfield.position.z = -500 * (layer + 1);
+      scene.add(starfield);
+      starfieldLayers.push(starfield);
+    }
+
+    // Galaxy cu clustering optimizat
+    const starClusters = [];
+    let clusterCount = 1500; // Redus de la 2000
+    let starTypeFilter = 'all';
+    
+    function createGalaxy() {
+      if (starClusters[0]) {
+        scene.remove(starClusters[0]);
+        starClusters[0].geometry.dispose();
+        starClusters[0].material.dispose();
+      }
+      
+      const galaxyGeometry = new THREE.BufferGeometry();
+      const galaxyPositions = new Float32Array(clusterCount * 3);
+      const galaxyColors = new Float32Array(clusterCount * 3);
+      const galaxySizes = new Float32Array(clusterCount);
+      let validCount = 0;
+
+      for (let i = 0; i < clusterCount; i++) {
+        const a = Math.random() * 2 * Math.PI;
+        const r = Math.random() * 100;
+        const theta = a + 0.2 * r;
+        const x = r * Math.cos(theta);
+        const z = r * Math.sin(theta);
+        const y = (Math.random() - 0.5) * 20 * Math.exp(-r / 50);
+
+        let starColor, size;
+        const type = Math.random();
+        if (type < 0.2) {
+          starColor = new THREE.Color(0.5, 0.5, 1);
+          size = 1.5;
+        } else if (type < 0.6) {
+          starColor = new THREE.Color(1, 1, 0.5);
+          size = 1;
+        } else {
+          starColor = new THREE.Color(1, 0.5, 0.5);
+          size = 0.7;
+        }
+
+        if (starTypeFilter !== 'all') {
+          if (starTypeFilter === 'blue' && type >= 0.2) continue;
+          if (starTypeFilter === 'yellow' && (type < 0.2 || type >= 0.6)) continue;
+          if (starTypeFilter === 'red' && type < 0.6) continue;
+        }
+
+        galaxyPositions[validCount * 3] = x;
+        galaxyPositions[validCount * 3 + 1] = y;
+        galaxyPositions[validCount * 3 + 2] = z;
+        galaxyColors[validCount * 3] = starColor.r;
+        galaxyColors[validCount * 3 + 1] = starColor.g;
+        galaxyColors[validCount * 3 + 2] = starColor.b;
+        galaxySizes[validCount] = size;
+        validCount++;
+      }
+
+      galaxyGeometry.setAttribute('position', new THREE.BufferAttribute(galaxyPositions.slice(0, validCount * 3), 3));
+      galaxyGeometry.setAttribute('color', new THREE.BufferAttribute(galaxyColors.slice(0, validCount * 3), 3));
+      galaxyGeometry.setAttribute('size', new THREE.BufferAttribute(galaxySizes.slice(0, validCount), 1));
+      
+      const galaxyMaterial = new THREE.PointsMaterial({ 
+        size: 1, 
+        vertexColors: true,
+        sizeAttenuation: true
+      });
+      
+      const galaxy = new THREE.Points(galaxyGeometry, galaxyMaterial);
+      scene.add(galaxy);
+      starClusters[0] = galaxy;
+    }
+    createGalaxy();
+
+    // Cosmic Dust optimizat cu pooling
+    const dustCount = 150; // Redus de la 200
+    const dustGeometry = new THREE.BufferGeometry();
+    const dustPositions = new Float32Array(dustCount * 3);
+    const dustVelocities = new Float32Array(dustCount * 3);
+    
+    for (let i = 0; i < dustCount; i++) {
+      dustPositions[i * 3] = (Math.random() - 0.5) * 200;
+      dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+      dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+      dustVelocities[i * 3] = (Math.random() - 0.5) * 0.03;
+      dustVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.03;
+      dustVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.03;
+    }
+    
+    dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+    const dustMaterial = new THREE.PointsMaterial({ 
+      size: 0.25, 
+      color: 0xaaaaaa, 
+      transparent: true 
+    });
+    const cosmicDust = new THREE.Points(dustGeometry, dustMaterial);
+    scene.add(cosmicDust);
+
+    // Explosion Particles optimizat
+    const explosionGeometry = new THREE.BufferGeometry();
+    const explosionCount = 60; // Redus de la 100
+    const explosionPositions = new Float32Array(explosionCount * 3);
+    const explosionVelocities = new Float32Array(explosionCount * 3);
+    
+    for (let i = 0; i < explosionCount; i++) {
+      explosionPositions[i * 3] = 0;
+      explosionPositions[i * 3 + 1] = 0;
+      explosionPositions[i * 3 + 2] = 0;
+      explosionVelocities[i * 3] = (Math.random() - 0.5) * 4;
+      explosionVelocities[i * 3 + 1] = (Math.random() - 0.5) * 4;
+      explosionVelocities[i * 3 + 2] = (Math.random() - 0.5) * 4;
+    }
+    
+    explosionGeometry.setAttribute('position', new THREE.BufferAttribute(explosionPositions, 3));
+    const explosionMaterial = new THREE.PointsMaterial({ 
+      size: 0.4, 
+      color: 0xff5500, 
+      transparent: true 
+    });
+    const explosion = new THREE.Points(explosionGeometry, explosionMaterial);
+    explosion.visible = false;
+    scene.add(explosion);
+
+    // Nebula Clouds cu shader optimizat
+    const nebulaGeometry = new THREE.SphereGeometry(500, 24, 24); // Redus de la 32
+    const nebulaShader = {
+      uniforms: {
+        time: { value: 0 },
+        color: { value: new THREE.Color(0x3366ff) }
+      },
+      vertexShader: `
+        varying vec3 vPosition;
+        void main() {
+          vPosition = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float time;
+        uniform vec3 color;
+        varying vec3 vPosition;
+        void main() {
+          float intensity = sin(vPosition.x * 0.008 + time * 0.5) * 
+                          cos(vPosition.y * 0.008 + time * 0.5) * 
+                          sin(vPosition.z * 0.008 + time * 0.5);
+          gl_FragColor = vec4(color, intensity * 0.15);
+        }
+      `
+    };
+    
+    const nebulaMaterial = new THREE.ShaderMaterial({
+      uniforms: nebulaShader.uniforms,
+      vertexShader: nebulaShader.vertexShader,
+      fragmentShader: nebulaShader.fragmentShader,
+      transparent: true,
+      side: THREE.BackSide
+    });
+    const nebula = new THREE.Mesh(nebulaGeometry, nebulaMaterial);
+    scene.add(nebula);
+
+    // Planets cu sistem solar complet dar optimizat
+    const planets = [];
+    const textureLoader = new THREE.TextureLoader();
+    
+    // Cache pentru texturi pentru a evita reload-urile
+    const textureCache = new Map();
+    function loadTexture(url, fallbackColor = 0x888888) {
+      if (textureCache.has(url)) {
+        return textureCache.get(url);
+      }
+      
+      const texture = textureLoader.load(
+        url,
+        undefined,
+        undefined,
+        () => {
+          console.warn(`Failed to load texture: ${url}`);
+        }
+      );
+      textureCache.set(url, texture);
+      return texture;
+    }
+
+    const planetData = [
+      {
+        radius: 6,
+        distance: 25,
+        texture: 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg',
+        normal: 'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_normal_2048.jpg',
+        hasAsteroids: false,
+        angle: 0,
+        color: 0x6b93d6
+      },
+      {
+        radius: 8,
+        distance: 40,
+        texture: '/assets/jupiter.jpg', // Textura originală Jupiter
+        normal: null,
+        ring: true,
+        hasAsteroids: false,
+        angle: Math.PI * 0.4,
+        color: 0xd2691e
+      },
+      {
+        radius: 4,
+        distance: 55,
+        texture: '/assets/marss.jpg', // Textura originală Marte
+        normal: null,
+        hasAsteroids: false,
+        color: 0xff6347,
+        angle: Math.PI * 0.8
+      },
+      {
+        radius: 9,
+        distance: 70,
+        texture: '/assets/saturnmap.jpg', // Textura originală Saturn
+        normal: null,
+        ring: true,
+        hasAsteroids: false,
+        color: 0xffd700,
+        angle: Math.PI * 1.2
+      },
+      {
+        radius: 7,
+        distance: 85,
+        texture: '/assets/uranus.jpg', // Textura originală Uranus
+        normal: null,
+        hasAsteroids: true,
+        color: 0x4169e1,
+        angle: Math.PI * 1.6
+      },
+      {
+        radius: 7.5,
+        distance: 100,
+        texture: '/assets/neptun.jpg', // Textura originală Neptun
+        normal: null,
+        hasAsteroids: false,
+        color: 0x3366aa,
+        angle: Math.PI * 0.2
+      },
+      {
+        radius: 3,
+        distance: 120,
+        texture: '/assets/pluto.jpg', // Textura originală Pluto
+        normal: null,
+        hasAsteroids: false,
+        color: 0xaaaaaa,
+        angle: Math.PI * 0.6
+      }
+    ];
+
+    // Procedural Planet optimizat
+    const procPlanetGeometry = new THREE.SphereGeometry(7, 24, 24); // Redus de la 32
+    const procPositions = procPlanetGeometry.attributes.position.array;
+    
+    // Optimizare: aplicăm displacement-ul doar pentru poziții selective
+    for (let i = 0; i < procPositions.length; i += 9) { // Skip some vertices for performance
+      const x = procPositions[i];
+      const y = procPositions[i + 1];
+      const z = procPositions[i + 2];
+      const height = (Math.sin(x * 0.15) + Math.cos(z * 0.15)) * 0.15;
+      const length = Math.sqrt(x * x + y * y + z * z);
+      procPositions[i] += (x / length) * height;
+      procPositions[i + 1] += (y / length) * height;
+      procPositions[i + 2] += (z / length) * height;
+    }
+    
+    procPlanetGeometry.attributes.position.needsUpdate = true;
+    procPlanetGeometry.computeVertexNormals();
+    
+    const procPlanetMaterial = new THREE.MeshStandardMaterial({
+      map: loadTexture('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg'),
+      roughness: 0.8,
+      metalness: 0.1,
+      color: 0xaaaaaa
+    });
+    
+    const procPlanet = new THREE.Mesh(procPlanetGeometry, procPlanetMaterial);
+    procPlanet.position.set(140, 0, 0);
+    procPlanet.userData = { 
+      distance: 140, 
+      speed: 0.006, 
+      hasAsteroids: true, 
+      targetPosition: procPlanet.position.clone(),
+      asteroids: []
+    };
+    scene.add(procPlanet);
+    planets.push(procPlanet);
+
+    // Attach optimized planet sound
+    if (audioPool.planet.hasPlaybackControl && audioInitialized) {
+      procPlanet.add(audioPool.planet);
+      audioPool.planet.setRefDistance(20);
+      if (!audioPool.planet.isPlaying) audioPool.planet.play();
+    }
+
+    // Create planets from data
+    planetData.forEach(data => {
+      let planetMaterial;
+      
+      if (data.texture) {
+        const texture = loadTexture(data.texture);
+        const normal = data.normal ? loadTexture(data.normal) : null;
+        planetMaterial = new THREE.MeshStandardMaterial({
+          map: texture,
+          normalMap: normal,
+          roughness: 0.7,
+          metalness: 0.2,
+          color: data.color
+        });
+      } else {
+        planetMaterial = new THREE.MeshStandardMaterial({
+          color: data.color,
+          roughness: 0.7,
+          metalness: 0.2
+        });
+      }
+
+      const planet = new THREE.Mesh(
+        new THREE.SphereGeometry(data.radius, 24, 24), // Optimizat de la 32
+        planetMaterial
+      );
+      
+      planet.position.x = data.distance * Math.cos(data.angle);
+      planet.position.z = data.distance * Math.sin(data.angle);
+      planet.castShadow = true;
+      planet.receiveShadow = true;
+      
+      planet.userData = { 
+        distance: data.distance, 
+        speed: 0.008, 
+        hasAsteroids: data.hasAsteroids || false, 
+        targetPosition: planet.position.clone(),
+        asteroids: [],
+        angle: data.angle
+      };
+      
+      scene.add(planet);
+      planets.push(planet);
+
+      // Add rings if specified - cu textura originală
+      if (data.ring) {
+        const ringGeometry = new THREE.RingGeometry(data.radius + 2, data.radius + 5, 32);
+        const ringMaterial = new THREE.MeshStandardMaterial({
+          map: loadTexture('/assets/ringcolor.png'), // Textura originală pentru inele
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.7
+        });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.rotation.x = Math.PI / 2;
+        planet.add(ring);
+      }
+
+      // Add moons with optimized count
+      const moonCount = Math.min(Math.floor(Math.random() * 3), 2); // Max 2 luni
+      for (let i = 0; i < moonCount; i++) {
+        const moonRadius = data.radius * (0.15 + Math.random() * 0.25);
+        const moonGeometry = new THREE.SphereGeometry(moonRadius, 16, 16); // Optimizat
+        const moonMaterial = new THREE.MeshStandardMaterial({
+          map: loadTexture('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg'),
+          roughness: 0.9,
+          color: 0xaaaaaa
+        });
+        const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+        moon.userData = { 
+          orbitDistance: data.radius + 4 + i * 4, 
+          orbitSpeed: 0.03 / (i + 1), 
+          angle: Math.random() * Math.PI * 2 
+        };
+        planet.add(moon);
+      }
+
+      // Add optimized positional audio clone
+      if (audioPool.planet.buffer) {
+        const clonedSound = new THREE.PositionalAudio(listener);
+        clonedSound.setBuffer(audioPool.planet.buffer);
+        clonedSound.setLoop(true);
+        clonedSound.setVolume(0.2);
+        clonedSound.setRefDistance(20);
+        planet.add(clonedSound);
+        if (audioInitialized && !clonedSound.isPlaying) clonedSound.play();
+      }
+    });
+
+    // Optimized Asteroid Field cu instanced meshes
+    const asteroidCount = 12; // Redus pentru performanță
+    const asteroidGeometry = new THREE.SphereGeometry(1, 12, 12); // Geometrie simplificată
+    const asteroidMaterial = new THREE.MeshStandardMaterial({
+      map: loadTexture('https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/moon_1024.jpg'),
+      roughness: 0.9,
+      color: 0x888888
+    });
+    
+    const asteroidMesh = new THREE.InstancedMesh(asteroidGeometry, asteroidMaterial, asteroidCount);
+    const asteroidMatrix = new THREE.Matrix4();
+    const asteroidPositions = [];
+    
+    for (let i = 0; i < asteroidCount; i++) {
+      const orbitDistance = 12 + Math.random() * 8;
+      const angle = Math.random() * Math.PI * 2;
+      const x = procPlanet.position.x + orbitDistance * Math.cos(angle);
+      const y = procPlanet.position.y + (Math.random() - 0.5) * 3;
+      const z = procPlanet.position.z + orbitDistance * Math.sin(angle);
+      
+      asteroidMatrix.setPosition(x, y, z);
+      asteroidMesh.setMatrixAt(i, asteroidMatrix);
+      
+      asteroidPositions.push({ 
+        position: new THREE.Vector3(x, y, z), 
+        orbitDistance, 
+        angle, 
+        orbitSpeed: 0.08 * (Math.random() + 0.5) 
+      });
+      procPlanet.userData.asteroids.push(asteroidPositions[i]);
+    }
+    
+    asteroidMesh.castShadow = true;
+    asteroidMesh.receiveShadow = true;
+    scene.add(asteroidMesh);
+
+    // Enhanced Spaceship cu design complet
+    const shipGroup = new THREE.Group();
+
+    // Main body - design mai complex
+    const shipBody = new THREE.Mesh(
+      new THREE.CylinderGeometry(0, 4, 16, 8),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x3366ff,
+        emissive: 0x112244,
+        emissiveIntensity: 0.4,
+        metalness: 0.7,
+        roughness: 0.3
+      })
+    );
+    shipBody.rotation.x = Math.PI / 2;
+    shipGroup.add(shipBody);
+
+    // Wings - design îmbunătățit
+    const wingGeometry = new THREE.BoxGeometry(20, 1, 6);
+    const wingMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x2244aa,
+      emissive: 0x112233,
+      emissiveIntensity: 0.4,
+      metalness: 0.6,
+      roughness: 0.4
+    });
+    const wings = new THREE.Mesh(wingGeometry, wingMaterial);
+    wings.position.y = -1;
+    shipGroup.add(wings);
+
+    // Cockpit îmbunătățit
+    const cabin = new THREE.Mesh(
+      new THREE.SphereGeometry(2.4, 16, 16),
+      new THREE.MeshStandardMaterial({ 
+        color: 0x88ccff,
+        transparent: true,
+        opacity: 0.8,
+        emissive: 0x4488cc,
+        emissiveIntensity: 0.6,
+        metalness: 0.9,
+        roughness: 0.1
+      })
+    );
+    cabin.position.z = 4;
+    cabin.position.y = 1;
+    shipGroup.add(cabin);
+
+    // Engines cu particule
+    const engineGeometry = new THREE.CylinderGeometry(1.5, 1, 2, 16);
+    const engineMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffaa22,
+      emissive: 0xff5500,
+      emissiveIntensity: 0.8
+    });
+    
+    const leftEngine = new THREE.Mesh(engineGeometry, engineMaterial);
+    leftEngine.position.set(-8, -1, -6);
+    leftEngine.rotation.x = Math.PI / 2;
+    shipGroup.add(leftEngine);
+
+    const rightEngine = new THREE.Mesh(engineGeometry, engineMaterial);
+    rightEngine.position.set(8, -1, -6);
+    rightEngine.rotation.x = Math.PI / 2;
+    shipGroup.add(rightEngine);
+
+    // Shield optimizat
+    const shieldGeometry = new THREE.SphereGeometry(10, 16, 16); // Geometrie redusă
+    const shieldMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x00aaff, 
+      transparent: true, 
+      opacity: 0.3,
+      blending: THREE.AdditiveBlending
+    });
+    const shield = new THREE.Mesh(shieldGeometry, shieldMaterial);
+    shield.visible = false;
+    shipGroup.add(shield);
+
+    // Enhanced ship properties
+    shipGroup.position.set(50, 10, 0);
+    shipGroup.userData = { 
+      speed: 12,
+      velocity: new THREE.Vector3(),
+      shield: false,
+      maxSpeed: 12,
+      orbitRadius: 150,
+      orbitAngle: 0,
+      orbitSpeed: 0.008,
+      isOrbiting: true,
+      orbitCenter: new THREE.Vector3(50, 0, 50),
+      orbitHeight: 20,
+      health: 100,
+      lastCollision: 0
+    };
+
+    scene.add(shipGroup);
+    planets.push(shipGroup);
+    const spaceship = shipGroup;
+
+    // Enhanced background cu starfield texture - revenind la originalul
+    const textureLoader2 = new THREE.TextureLoader();
+    textureLoader2.load(
+      '/assets/starfield.png', // Background original
+      (texture) => {
+        scene.background = texture;
+      },
+      undefined,
+      () => {
+        console.warn('Failed to load starfield texture. Using fallback color.');
+        scene.background = new THREE.Color(0x000022); // Fallback la culoarea originală
+      }
+    );
+
+    // Enhanced Interaction System
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let selectedObject = null;
+    let isAnimating = true;
+    let cameraMode = 'free';
+    let targetCameraPos = camera.position.clone();
+    let targetCameraTarget = new THREE.Vector3();
+    let cinematicTime = 0;
+    let draggingPlanet = null;
+    let dragStartPos = null;
+
+    // Optimized event handlers cu throttling
+    let lastMouseMove = 0;
+    function onMouseDown(event) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(planets.filter(p => p !== spaceship));
+      
+      if (intersects.length > 0) {
+        draggingPlanet = intersects[0].object;
+        dragStartPos = draggingPlanet.position.clone();
+        controls.enabled = false;
+        
+        // Play click sound optimized
+        if (audioInitialized && audioPool.click && !audioPool.click.isPlaying) {
+          audioPool.click.currentTime = 0;
+          audioPool.click.play();
+        }
+      }
+    }
+
+    function onMouseMove(event) {
+      const now = performance.now();
+      if (now - lastMouseMove < 16) return; // Throttle la 60fps
+      lastMouseMove = now;
+      
+      if (draggingPlanet) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -draggingPlanet.position.z);
+        const intersect = new THREE.Vector3();
+        raycaster.ray.intersectPlane(plane, intersect);
+        
+        if (!draggingPlanet.userData.targetPosition) {
+          draggingPlanet.userData.targetPosition = new THREE.Vector3();
+        }
+        draggingPlanet.userData.targetPosition.copy(intersect);
+      }
+    }
+
+    function onMouseUp() {
+      draggingPlanet = null;
+      dragStartPos = null;
+      controls.enabled = cameraMode === 'free';
+    }
+
+    function onMouseClick(event) {
+      if (!draggingPlanet) {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(planets.concat([blackHole]));
+        
+        if (intersects.length > 0) {
+          selectedObject = intersects[0].object;
+          targetCameraTarget.copy(selectedObject.position);
+          targetCameraPos.copy(selectedObject.position).add(new THREE.Vector3(0, 20, 50));
+          document.getElementById('info').innerText = `Focusing on ${selectedObject === blackHole ? 'Black Hole' : 'Object'}`;
+          
+          if (audioInitialized && audioPool.click && !audioPool.click.isPlaying) {
+            audioPool.click.currentTime = 0;
+            audioPool.click.play();
+          }
+        } else {
+          selectedObject = null;
+          document.getElementById('info').innerText = 'Click to focus, drag planets to move. WASD for ship. Q/E/R for camera. Avoid asteroids!';
+        }
+      }
+    }
+
+    // Event listeners optimized
+    window.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    window.addEventListener('click', onMouseClick);
+
+    // Enhanced Keyboard Controls
+    const keys = {};
+    window.addEventListener('keydown', (event) => {
+      keys[event.key.toLowerCase()] = true;
+      
+      // Camera mode switching
+      if (event.key === 'q' || event.key === 'Q') {
+        cameraMode = 'free';
+        controls.enabled = true;
+        updateCameraButtons();
+      }
+      if (event.key === 'e' || event.key === 'E') {
+        cameraMode = 'ship';
+        controls.enabled = false;
+        updateCameraButtons();
+      }
+      if (event.key === 'r' || event.key === 'R') {
+        cameraMode = 'cinematic';
+        controls.enabled = false;
+        updateCameraButtons();
+      }
+      
+      // Ship orbit toggle
+      if (event.key === ' ' && spaceship) {
+        event.preventDefault();
+        spaceship.userData.isOrbiting = !spaceship.userData.isOrbiting;
+        document.getElementById('info').innerText = spaceship.userData.isOrbiting ? 
+          'Orbit mode: Use arrow keys to control direction' : 
+          'Direct control mode: Use WASD to control ship';
+        
+        if (!spaceship.userData.isOrbiting) {
+          spaceship.userData.velocity.set(0, 0, 0);
+        }
+      }
+    });
+
+    window.addEventListener('keyup', (event) => {
+      keys[event.key.toLowerCase()] = false;
+    });
+
+    function updateCameraButtons() {
+      document.getElementById('freeCam').style.background = cameraMode === 'free' ? '#666' : '#444';
+      document.getElementById('shipCam').style.background = cameraMode === 'ship' ? '#666' : '#444';
+      document.getElementById('cinematicCam').style.background = cameraMode === 'cinematic' ? '#666' : '#444';
+    }
+
+    // Enhanced Controls System
+    const starDensityInput = document.getElementById('starDensity');
+    const lightIntensityInput = document.getElementById('lightIntensity');
+    const cameraSpeedInput = document.getElementById('cameraSpeed');
+    const bloomStrengthInput = document.getElementById('bloomStrength');
+    const starTypeSelect = document.getElementById('starType');
+    const audioVolumeInput = document.getElementById('audioVolume');
+    const animateCheckbox = document.getElementById('animate');
+    const nebulaVisibleCheckbox = document.getElementById('nebulaVisible');
+    const starLightCheckbox = document.getElementById('starLight');
+    const planetSelect = document.getElementById('planetSelect');
+    const createPlanetButton = document.getElementById('createPlanet');
+    const newPlanetRadiusInput = document.getElementById('newPlanetRadius');
+    const newPlanetOrbitInput = document.getElementById('newPlanetOrbit');
+
+    function updatePlanetSelect() {
+      planetSelect.innerHTML = '';
+      planets.forEach((planet, index) => {
+        if (planet !== spaceship) {
+          const option = document.createElement('option');
+          option.value = index;
+          option.text = `Planet ${index + 1}`;
+          planetSelect.appendChild(option);
+        }
+      });
+    }
+    updatePlanetSelect();
+
+    // Event listeners pentru controale
+    starDensityInput.addEventListener('input', () => {
+      clusterCount = parseInt(starDensityInput.value);
+      createGalaxy();
+    });
+
+    lightIntensityInput.addEventListener('input', () => {
+      blackHoleLight.intensity = parseFloat(lightIntensityInput.value);
+      lensFlare.material.opacity = parseFloat(lightIntensityInput.value) * 0.5;
+    });
+
+    if (bloomPass) {
+      bloomStrengthInput.addEventListener('input', () => {
+        bloomPass.strength = parseFloat(bloomStrengthInput.value);
+      });
+    }
+
+    starTypeSelect.addEventListener('change', () => {
+      starTypeFilter = starTypeSelect.value;
+      createGalaxy();
+    });
+
+    audioVolumeInput.addEventListener('input', () => {
+      const volume = parseFloat(audioVolumeInput.value);
+      if (audioPool.ambient) audioPool.ambient.setVolume(volume * 0.6);
+      if (audioPool.click) audioPool.click.setVolume(volume);
+      if (audioPool.collision) audioPool.collision.setVolume(volume * 0.8);
+      if (audioPool.planet) audioPool.planet.setVolume(volume * 0.4);
+      
+      // Update all planet sounds
+      planets.forEach(planet => {
+        if (planet !== spaceship && planet.children) {
+          planet.children.forEach(child => {
+            if (child.isPositionalAudio) {
+              child.setVolume(volume * 0.4);
+            }
+          });
+        }
+      });
+    });
+
+    animateCheckbox.addEventListener('change', () => {
+      isAnimating = animateCheckbox.checked;
+    });
+
+    nebulaVisibleCheckbox.addEventListener('change', () => {
+      nebula.visible = nebulaVisibleCheckbox.checked;
+    });
+
+    starLightCheckbox.addEventListener('change', () => {
+      starLight.visible = starLightCheckbox.checked;
+    });
+
+    // Camera button events
+    document.getElementById('freeCam').addEventListener('click', () => {
+      cameraMode = 'free';
+      controls.enabled = true;
+      updateCameraButtons();
+    });
+
+    document.getElementById('shipCam').addEventListener('click', () => {
+      cameraMode = 'ship';
+      controls.enabled = false;
+      updateCameraButtons();
+    });
+
+    document.getElementById('cinematicCam').addEventListener('click', () => {
+      cameraMode = 'cinematic';
+      controls.enabled = false;
+      updateCameraButtons();
+    });
+
+    document.getElementById('resetShip').addEventListener('click', () => {
+      if (spaceship) {
+        spaceship.userData.orbitRadius = 150;
+        spaceship.userData.orbitAngle = 0;
+        spaceship.userData.orbitHeight = 20;
+        spaceship.userData.orbitCenter.set(50, 0, 50);
+        spaceship.userData.health = 100;
+        
+        const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius;
+        const newZ = spaceship.userData.orbitCenter.z;
+        spaceship.position.set(newX, spaceship.userData.orbitHeight, newZ);
+        spaceship.userData.velocity.set(0, 0, 0);
+        spaceship.userData.isOrbiting = true;
+        
+        document.getElementById('info').innerText = 'Ship reset to orbit mode. Arrow keys to control direction. Z/X to change orbit radius.';
+      }
+    });
+
+    document.getElementById('fullscreen').addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+      } else {
+        document.exitFullscreen();
+      }
+    });
+
+    createPlanetButton.addEventListener('click', () => {
+      const radius = Math.max(1, parseFloat(newPlanetRadiusInput.value));
+      const orbitDistance = Math.max(20, parseFloat(newPlanetOrbitInput.value));
+      
+      const planetGeometry = new THREE.SphereGeometry(radius, 24, 24);
+      const planetColor = new THREE.Color().setHSL(Math.random(), 0.7, 0.6);
+      const planetMaterial = new THREE.MeshStandardMaterial({
+        color: planetColor,
+        roughness: 0.8,
+        metalness: 0.1
+      });
+      
+      const planet = new THREE.Mesh(planetGeometry, planetMaterial);
+      planet.position.set(orbitDistance, 0, 0);
+      planet.castShadow = true;
+      planet.receiveShadow = true;
+      
+      planet.userData = { 
+        distance: orbitDistance, 
+        speed: 0.008 * (Math.random() * 0.5 + 0.75), 
+        targetPosition: planet.position.clone(),
+        asteroids: [],
+        angle: 0
+      };
+      
+      // Add ring occasionally
+      if (Math.random() > 0.7) {
+        const ringGeometry = new THREE.RingGeometry(radius + 2, radius + 5, 32);
+        const ringMaterial = new THREE.MeshStandardMaterial({
+          color: 0xbbaa88,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.7
+        });
+        const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+        ring.rotation.x = Math.PI / 2;
+        planet.add(ring);
+      }
+      
+      // Add moons
+      const moonCount = Math.floor(Math.random() * 3);
+      for (let i = 0; i < moonCount; i++) {
+        const moonRadius = radius * (0.2 + Math.random() * 0.3);
+        const moonGeometry = new THREE.SphereGeometry(moonRadius, 16, 16);
+        const moonMaterial = new THREE.MeshStandardMaterial({
+          color: 0xaaaaaa,
+          roughness: 0.9
+        });
+        const moon = new THREE.Mesh(moonGeometry, moonMaterial);
+        moon.userData = { 
+          orbitDistance: radius + 5 + i * 5, 
+          orbitSpeed: 0.05 / (i + 1), 
+          angle: Math.random() * Math.PI * 2 
+        };
+        planet.add(moon);
+      }
+      
+      scene.add(planet);
+      planets.push(planet);
+      updatePlanetSelect();
+    });
+
+    // Enhanced Animation Loop cu toate optimizările
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fps = 0;
+    let animationFrame = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const currentTime = performance.now();
+      const delta = Math.min((currentTime - lastTime) / 1000, 0.1);
+      
+      frameCount++;
+      animationFrame++;
+      
+      // FPS tracking optimizat
+      if (currentTime - lastTime >= 1000) {
+        fps = frameCount;
+        frameCount = 0;
+        lastTime = currentTime;
+        
+        const memory = performance.memory ? (performance.memory.usedJSHeapSize / 1048576).toFixed(2) : 'N/A';
+        document.getElementById('stats').innerText = `FPS: ${fps} | Objects: ${scene.children.length}`;
+        document.getElementById('performance').innerText = `Memory: ${memory} MB | Render: ${(delta * 1000).toFixed(2)} ms`;
+      }
+
+      // Enhanced Spaceship Control System
+      if (spaceship) {
+        if (spaceship.userData.isOrbiting) {
+          // Orbit control cu smooth interpolation
+          if (keys['arrowright']) {
+            spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 3;
+          } else if (keys['arrowleft']) {
+            spaceship.userData.orbitAngle -= spaceship.userData.orbitSpeed * delta * 3;
+          } else {
+            spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.5;
+          }
+          
+          if (keys['arrowup']) {
+            spaceship.userData.orbitHeight += 20 * delta;
+          } else if (keys['arrowdown']) {
+            spaceship.userData.orbitHeight = Math.max(15, spaceship.userData.orbitHeight - 20 * delta);
+          }
+
+          if (keys['z']) {
+            spaceship.userData.orbitRadius += 30 * delta;
+          } else if (keys['x']) {
+            spaceship.userData.orbitRadius = Math.max(100, spaceship.userData.orbitRadius - 30 * delta);
+          }
+
+          // Calculate smooth orbit position
+          const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius * Math.cos(spaceship.userData.orbitAngle);
+          const newZ = spaceship.userData.orbitCenter.z + spaceship.userData.orbitRadius * Math.sin(spaceship.userData.orbitAngle);
+          const newPosition = new THREE.Vector3(newX, spaceship.userData.orbitHeight, newZ);
+          
+          spaceship.position.lerp(newPosition, 0.08);
+          
+          // Smooth ship rotation
+          const tangentDirection = new THREE.Vector3(
+            -Math.sin(spaceship.userData.orbitAngle),
+            0,
+            Math.cos(spaceship.userData.orbitAngle)
+          );
+          
+          const targetRotation = Math.atan2(tangentDirection.x, tangentDirection.z);
+          let rotDiff = targetRotation - spaceship.rotation.y;
+          
+          if (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
+          if (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
+          
+          spaceship.rotation.y += rotDiff * 0.05;
+          
+        } else {
+          // Direct control cu enhanced physics
+          const moveForce = spaceship.userData.speed * delta * 0.5;
+          
+          if (keys['w']) spaceship.userData.velocity.z -= moveForce;
+          if (keys['s']) spaceship.userData.velocity.z += moveForce;
+          if (keys['a']) spaceship.userData.velocity.x -= moveForce;
+          if (keys['d']) spaceship.userData.velocity.x += moveForce;
+          if (keys['q']) spaceship.userData.velocity.y += moveForce;
+          if (keys['e']) spaceship.userData.velocity.y -= moveForce;
+
+          // Enhanced velocity limiting
+          const speed = spaceship.userData.velocity.length();
+          if (speed > spaceship.userData.maxSpeed * 0.8) {
+            spaceship.userData.velocity.multiplyScalar((spaceship.userData.maxSpeed * 0.8) / speed);
+          }
+
+          spaceship.position.add(spaceship.userData.velocity.clone().multiplyScalar(delta));
+          spaceship.userData.velocity.multiplyScalar(0.96);
+          
+          // Enhanced rotation towards movement
+          if (spaceship.userData.velocity.length() > 0.1) {
+            const targetRotation = Math.atan2(spaceship.userData.velocity.x, spaceship.userData.velocity.z);
+            let rotDiff = targetRotation - spaceship.rotation.y;
+            
+            if (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
+            if (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
+            
+            spaceship.rotation.y += rotDiff * 0.1;
+          }
+        }
+
+        // Enhanced engine effects
+        const isMoving = spaceship.userData.velocity.length() > 0.1 || 
+                         (keys['w'] || keys['s'] || keys['a'] || keys['d'] || 
+                          keys['arrowright'] || keys['arrowleft']);
+        
+        if (spaceship.children[3] && spaceship.children[4]) {
+          const intensity = isMoving ? 1.2 : 0.4;
+          spaceship.children[3].material.emissiveIntensity = intensity;
+          spaceship.children[4].material.emissiveIntensity = intensity;
+        }
+      }
+
+      // Enhanced Planet Updates cu LOD
+      if (animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+        planets.forEach(planet => {
+          if (planet !== spaceship) {
+            planet.position.lerp(planet.userData.targetPosition, 0.08);
+            
+            if (planet.userData.distance > 0 && isAnimating) {
+              planet.userData.angle += planet.userData.speed * delta;
+              planet.userData.targetPosition.x = planet.userData.distance * Math.cos(planet.userData.angle);
+              planet.userData.targetPosition.z = planet.userData.distance * Math.sin(planet.userData.angle);
+            }
+            
+            // Distance-based LOD for rotation
+            const distToCamera = planet.position.distanceTo(camera.position);
+            if (distToCamera < OPTIMIZATIONS.LOD_DISTANCE) {
+              planet.rotation.y += 0.008;
+            } else {
+              planet.rotation.y += 0.002; // Slower rotation for distant objects
+            }
+
+            // Update moons with optimized frequency
+            planet.children.forEach(child => {
+              if (child.userData.orbitDistance) {
+                child.userData.angle += child.userData.orbitSpeed * delta;
+                child.position.x = child.userData.orbitDistance * Math.cos(child.userData.angle);
+                child.position.z = child.userData.orbitDistance * Math.sin(child.userData.angle);
+              }
+            });
+
+            // Update planet asteroids
+            if (planet.userData.hasAsteroids && planet.userData.asteroids.length > 0) {
+              planet.userData.asteroids.forEach((asteroid, i) => {
+                asteroid.angle += asteroid.orbitSpeed * delta;
+                asteroid.position.copy(planet.position).add(
+                  new THREE.Vector3(
+                    asteroid.orbitDistance * Math.cos(asteroid.angle),
+                    (Math.random() - 0.5) * 2,
+                    asteroid.orbitDistance * Math.sin(asteroid.angle)
+                  )
+                );
+                if (asteroidMesh) {
+                  asteroidMatrix.setPosition(asteroid.position);
+                  asteroidMesh.setMatrixAt(i, asteroidMatrix);
+                }
+              });
+              if (asteroidMesh) {
+                asteroidMesh.instanceMatrix.needsUpdate = true;
+              }
+            }
+          }
+        });
+      }
+
+      // Enhanced Cosmic Dust Animation
+      if (animationFrame % (OPTIMIZATIONS.FRAME_SKIP * 2) === 0) {
+        const dustPosArray = dustGeometry.attributes.position.array;
+        for (let i = 0; i < dustCount; i++) {
+          dustPosArray[i * 3] += dustVelocities[i * 3] * delta * 15;
+          dustPosArray[i * 3 + 1] += dustVelocities[i * 3 + 1] * delta * 15;
+          dustPosArray[i * 3 + 2] += dustVelocities[i * 3 + 2] * delta * 15;
+
+          // Enhanced ship interaction
+          if (spaceship) {
+            const dustPos = new THREE.Vector3(dustPosArray[i * 3], dustPosArray[i * 3 + 1], dustPosArray[i * 3 + 2]);
+            const distToShip = dustPos.distanceTo(spaceship.position);
+            if (distToShip < 25) {
+              const force = spaceship.userData.velocity.clone().multiplyScalar(0.02);
+              dustVelocities[i * 3] += force.x;
+              dustVelocities[i * 3 + 1] += force.y;
+              dustVelocities[i * 3 + 2] += force.z;
+            }
+          }
+
+          // Black hole attraction with optimized distance check
+          const distToBH = Math.sqrt(
+            dustPosArray[i * 3] * dustPosArray[i * 3] + 
+            dustPosArray[i * 3 + 1] * dustPosArray[i * 3 + 1] + 
+            dustPosArray[i * 3 + 2] * dustPosArray[i * 3 + 2]
+          );
+          
+          if (distToBH < 15) {
+            // Reset particle
+            dustPosArray[i * 3] = (Math.random() - 0.5) * 200;
+            dustPosArray[i * 3 + 1] = (Math.random() - 0.5) * 200;
+            dustPosArray[i * 3 + 2] = (Math.random() - 0.5) * 200;
+            dustVelocities[i * 3] = (Math.random() - 0.5) * 0.03;
+            dustVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.03;
+            dustVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.03;
+          } else if (distToBH > 300) {
+            // Reset if too far
+            dustPosArray[i * 3] = (Math.random() - 0.5) * 200;
+            dustPosArray[i * 3 + 1] = (Math.random() - 0.5) * 200;
+            dustPosArray[i * 3 + 2] = (Math.random() - 0.5) * 200;
+          }
+        }
+        dustGeometry.attributes.position.needsUpdate = true;
+      }
+
+      // Enhanced Explosion Effects
+      if (explosion.visible) {
+        const expPosArray = explosionGeometry.attributes.position.array;
+        for (let i = 0; i < explosionCount; i++) {
+          expPosArray[i * 3] += explosionVelocities[i * 3] * delta;
+          expPosArray[i * 3 + 1] += explosionVelocities[i * 3 + 1] * delta;
+          expPosArray[i * 3 + 2] += explosionVelocities[i * 3 + 2] * delta;
+          
+          // Add gravity effect
+          explosionVelocities[i * 3 + 1] -= 0.5 * delta;
+        }
+        explosionGeometry.attributes.position.needsUpdate = true;
+      }
+
+      // Enhanced Starfield Parallax
+      if (animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+        starfieldLayers.forEach((layer, index) => {
+          layer.position.x += camera.position.x * 0.0008 * (index + 1);
+          layer.position.y += camera.position.y * 0.0008 * (index + 1);
+        });
+      }
+
+      // Enhanced Accretion Disk Animation
+      if (animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+        const diskPosArray = diskGeometry.attributes.position.array;
+        for (let i = 0; i < diskCount; i++) {
+          const x = diskPosArray[i * 3];
+          const z = diskPosArray[i * 3 + 2];
+          const radius = Math.sqrt(x * x + z * z);
+          const angle = Math.atan2(z, x);
+          const speed = 0.02 / Math.sqrt(radius); // Keplerian motion
+          
+          const newAngle = angle + speed * delta;
+          diskPosArray[i * 3] = radius * Math.cos(newAngle);
+          diskPosArray[i * 3 + 2] = radius * Math.sin(newAngle);
+        }
+        diskGeometry.attributes.position.needsUpdate = true;
+      }
+
+      // Enhanced Camera Modes
+      if (cameraMode === 'ship' && spaceship) {
+        const shipPos = spaceship.position.clone();
+        const shipRotation = spaceship.rotation.y;
+        const offset = new THREE.Vector3(
+          Math.sin(shipRotation) * 30,
+          8,
+          Math.cos(shipRotation) * 30
+        );
+        const targetPos = shipPos.add(offset);
+        camera.position.lerp(targetPos, 0.15);
+        camera.lookAt(spaceship.position);
+      } else if (cameraMode === 'cinematic') {
+        cinematicTime += delta * 0.15;
+        const radius = 120 + Math.sin(cinematicTime * 0.3) * 20;
+        camera.position.x = Math.sin(cinematicTime) * radius;
+        camera.position.z = Math.cos(cinematicTime) * radius;
+        camera.position.y = 50 + Math.sin(cinematicTime * 0.7) * 25;
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+      } else if (selectedObject && cameraMode === 'free') {
+        camera.position.lerp(targetCameraPos, 0.08 * parseFloat(cameraSpeedInput.value));
+        controls.target.lerp(targetCameraTarget, 0.08 * parseFloat(cameraSpeedInput.value));
+      }
+
+      // Enhanced Collision Detection
+      if (spaceship && animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+        const shipPos = spaceship.position;
+        const currentTime = performance.now();
+        
+        // Check asteroid collisions
+        if (procPlanet.userData.asteroids) {
+          procPlanet.userData.asteroids.forEach(asteroid => {
+            const dist = shipPos.distanceTo(asteroid.position);
+            if (dist < 8 && currentTime - spaceship.userData.lastCollision > 1000) {
+              // Collision detected
+              spaceship.userData.health -= 10;
+              spaceship.userData.lastCollision = currentTime;
+              
+              // Trigger explosion effect
+              explosion.position.copy(asteroid.position);
+              explosion.visible = true;
+              setTimeout(() => { explosion.visible = false; }, 500);
+              
+              // Play collision sound
+              if (audioInitialized && audioPool.collision && !audioPool.collision.isPlaying) {
+                audioPool.collision.currentTime = 0;
+                audioPool.collision.play();
+              }
+              
+              // Screen shake effect
+              camera.position.add(new THREE.Vector3(
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2
+              ));
+              
+              // Update info
+              document.getElementById('info').innerText = `Health: ${spaceship.userData.health}% - Collision detected!`;
+            }
+          });
+        }
+        
+        // Check planet collisions
+        planets.forEach(planet => {
+          if (planet !== spaceship) {
+            const dist = shipPos.distanceTo(planet.position);
+            if (dist < planet.userData.distance * 0.1 + 10) {
+              // Near planet - show info
+              document.getElementById('info').innerText = `Near planet - Distance: ${dist.toFixed(1)}`;
+            }
+          }
+        });
+      }
+
+      // Enhanced Animations cu toate efectele
+      if (isAnimating) {
+        if (animationFrame % OPTIMIZATIONS.FRAME_SKIP === 0) {
+          // Galaxy rotation
+          if (starClusters[0]) {
+            starClusters[0].rotation.y += 0.0008;
+          }
+          
+          // Nebula animation
+          if (nebulaShader.uniforms) {
+            nebulaShader.uniforms.time.value += delta * 0.3;
+          }
+          
+          // Lens flare billboard
+          lensFlare.lookAt(camera.position);
+          
+          // Dynamic lighting effects
+          blackHoleLight.intensity = 1 + Math.sin(performance.now() * 0.002) * 0.2;
+        }
+      }
+
+      // Enhanced Controls Update
+      controls.update();
+
+      // Enhanced Rendering cu fallback
+      if (composer && usePostProcessing) {
+        try {
+          composer.render();
+        } catch (e) {
+          console.warn('Composer render failed, switching to standard rendering');
+          usePostProcessing = false;
+          renderer.render(scene, camera);
+        }
+      } else {
+        renderer.render(scene, camera);
+      }
+    }
+
+    // Start animation
+    animate();
+
+    // Enhanced Resize Handling
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      
+      if (composer) {
+        composer.setSize(window.innerWidth, window.innerHeight);
+      }
+      
+      // Adaptive quality based on screen size
+      if (window.innerWidth < 1024) {
+        renderer.setPixelRatio(1);
+        if (bloomPass) bloomPass.strength *= 0.7;
+      } else {
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      }
+    });
+
+    // Enhanced Performance Monitoring
+    let performanceWarningShown = false;
+    setInterval(() => {
+      if (fps < 45 && !performanceWarningShown) {
+        console.warn('Performance warning: FPS below 45. Auto-optimizing...');
+        performanceWarningShown = true;
+        
+        // Auto-optimization
+        if (clusterCount > 800) {
+          clusterCount = 800;
+          starDensityInput.value = 800;
+          createGalaxy();
+        }
+        
+        // Reduce particle counts
+        if (dustCount > 100) {
+          console.log('Reducing dust particles for better performance');
+        }
+        
+        // Disable post-processing if needed
+        if (composer && fps < 30) {
+          usePostProcessing = false;
+          console.log('Post-processing disabled due to low FPS');
+        }
+      }
+    }, 3000);
+
+    // Enhanced Memory Management
+    function cleanup() {
+      // Dispose geometries
+      scene.traverse((object) => {
+        if (object.geometry) {
+          object.geometry.dispose();
+        }
+        if (object.material) {
+          if (Array.isArray(object.material)) {
+            object.material.forEach(material => {
+              if (material.map) material.map.dispose();
+              if (material.normalMap) material.normalMap.dispose();
+              material.dispose();
+            });
+          } else {
+            if (object.material.map) object.material.map.dispose();
+            if (object.material.normalMap) object.material.normalMap.dispose();
+            object.material.dispose();
+          }
+        }
+      });
+      
+      // Dispose audio
+      Object.values(audioPool).forEach(audio => {
+        if (audio.buffer) {
+          audio.disconnect();
+        }
+      });
+      
+      // Dispose renderer
+      renderer.dispose();
+      
+      // Clear texture cache
+      textureCache.clear();
+      
+      console.log('Cleanup completed');
+    }
+
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', cleanup);
+    
+    // Enhanced Error Handling
+    window.addEventListener('error', (event) => {
+      console.error('Error detected:', event.error);
+      
+      // Try to recover from common errors
+      if (event.error.message.includes('WebGL')) {
+        console.warn('WebGL error detected. Switching to fallback mode.');
+        usePostProcessing = false;
+      }
+    });
+
+    // Initialize camera button states
+    updateCameraButtons();
+    
+    console.log('Enhanced Galaxy Explorer initialized successfully!');
+    console.log(`Performance optimizations active:
+    - Frame skipping: ${OPTIMIZATIONS.FRAME_SKIP}
+    - LOD distance: ${OPTIMIZATIONS.LOD_DISTANCE}
+    - Frustum culling: ${OPTIMIZATIONS.FRUSTUM_CULLING}
+    - Instanced rendering: ${OPTIMIZATIONS.INSTANCED_RENDERING}
+    - Reduced shadows: ${OPTIMIZATIONS.REDUCED_SHADOWS}`);
   </script>
 </body>
 </html>

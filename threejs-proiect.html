@@ -189,7 +189,6 @@
     // Set audio with local paths (replace with your audio files)
     setAudioWithFallback(ambientSound, './sounds/ambient_space.mp3', false, true, 0.5);
     setAudioWithFallback(clickSound, './sounds/click.mp3', false, false, 0.7);
-    setAudioWithFallback(collisionSound, './sounds/explosion.mp3', false, false, 0.5);
     setAudioWithFallback(planetSound, './sounds/planet_hum.mp3', true, true, 0.3);
 
     // Trigger audio initialization on first click
@@ -366,31 +365,6 @@ const dustMaterial = new THREE.PointsMaterial({ size: 0.25, color: 0xaaaaaa, tra
 const cosmicDust = new THREE.Points(dustGeometry, dustMaterial);
 scene.add(cosmicDust);
 
-    // Explosion Particles
-// Explosion Particles (număr redus la 50 și animare doar la nevoie)
-const explosionGeometry = new THREE.BufferGeometry();
-const explosionCount = 50; // înainte: 100
-const explosionPositions = new Float32Array(explosionCount * 3);
-const explosionVelocities = new Float32Array(explosionCount * 3);
-for (let i = 0; i < explosionCount; i++) {
-  // inițial toate la (0,0,0)
-  explosionPositions[i * 3] = 0;
-  explosionPositions[i * 3 + 1] = 0;
-  explosionPositions[i * 3 + 2] = 0;
-  // viteze mai mici
-  explosionVelocities[i * 3] = (Math.random() - 0.5) * 3;
-  explosionVelocities[i * 3 + 1] = (Math.random() - 0.5) * 3;
-  explosionVelocities[i * 3 + 2] = (Math.random() - 0.5) * 3;
-}
-explosionGeometry.setAttribute('position', new THREE.BufferAttribute(explosionPositions, 3));
-const explosionMaterial = new THREE.PointsMaterial({ size: 0.4, color: 0xff5500, transparent: true });
-const explosion = new THREE.Points(explosionGeometry, explosionMaterial);
-explosion.visible = false;
-scene.add(explosion);
-
-// În bucla de coliziune, activează doar când e nevoie:
-//   explosion.visible = true;
-//   setTimeout(() => { explosion.visible = false; }, 300);
 
 
 
@@ -1484,16 +1458,7 @@ if (spaceship && spaceship.userData.isOrbiting) {
       }
       dustGeometry.attributes.position.needsUpdate = true;
 
-      // Update Explosion
-      if (explosion.visible) {
-        const expPosArray = explosionGeometry.attributes.position.array;
-        for (let i = 0; i < explosionCount; i++) {
-          expPosArray[i * 3] += explosionVelocities[i * 3] * delta;
-          expPosArray[i * 3 + 1] += explosionVelocities[i * 3 + 1] * delta;
-          expPosArray[i * 3 + 2] += explosionVelocities[i * 3 + 2] * delta;
-        }
-        explosionGeometry.attributes.position.needsUpdate = true;
-      }
+
 
       // Update Starfield Parallax
       starfieldLayers.forEach((layer, index) => {

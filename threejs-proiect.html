@@ -71,7 +71,6 @@
     <label>Light Intensity: <input type="range" id="lightIntensity" min="0" max="2" value="1" step="0.1"></label>
     <label>Camera Speed: <input type="range" id="cameraSpeed" min="0.1" max="2" value="1" step="0.1"></label>
     <label>Bloom Strength: <input type="range" id="bloomStrength" min="0" max="2" value="0.5" step="0.1"></label>
-    <label>Dust Reactivity: <input type="range" id="dustReactivity" min="0" max="1" value="0.5" step="0.1"></label>
     <label>Star Type: 
       <select id="starType">
         <option value="all">All</option>
@@ -84,13 +83,10 @@
     <label><input type="checkbox" id="animate" checked> Animate Galaxy</label>
     <label><input type="checkbox" id="nebulaVisible" checked> Show Nebula</label>
     <label><input type="checkbox" id="starLight" checked> Secondary Star Light</label>
-    <label><input type="checkbox" id="shieldMode"> Ship Shield</label>
     <button id="freeCam">Free Camera</button>
     <button id="shipCam">Ship Camera</button>
     <button id="cinematicCam">Cinematic Camera</button>
     <button id="resetShip">Reset Ship</button>
-    <button id="saveState">Save State</button>
-    <button id="loadState">Load State</button>
     <button id="fullscreen">Toggle Fullscreen</button>
     <div id="stats">FPS: 0 | Objects: 0</div>
   </div>
@@ -101,7 +97,6 @@
     <label>X: <input type="number" id="planetX" value="0" step="1"></label>
     <label>Y: <input type="number" id="planetY" value="0" step="1"></label>
     <label>Z: <input type="number" id="planetZ" value="0" step="1"></label>
-    <button id="movePlanet">Move Planet</button>
     <button id="createPlanet">Create New Planet</button>
     <label>Radius: <input type="number" id="newPlanetRadius" value="5" step="1" min="1"></label>
     <label>Orbit Distance: <input type="number" id="newPlanetOrbit" value="50" step="1" min="0"></label>
@@ -258,25 +253,25 @@
     composer.addPass(lensPass);
 
     // Accretion Disk (Particles)
-    const diskGeometry = new THREE.BufferGeometry();
-    const diskCount = 1000;
-    const diskPositions = new Float32Array(diskCount * 3);
-    const diskColors = new Float32Array(diskCount * 3);
-    for (let i = 0; i < diskCount; i++) {
-      const radius = 12 + Math.random() * 5;
-      const theta = Math.random() * Math.PI * 2;
-      diskPositions[i * 3] = radius * Math.cos(theta);
-      diskPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.5;
-      diskPositions[i * 3 + 2] = radius * Math.sin(theta);
-      diskColors[i * 3] = 1;
-      diskColors[i * 3 + 1] = Math.random() * 0.5 + 0.5;
-      diskColors[i * 3 + 2] = 0;
-    }
-    diskGeometry.setAttribute('position', new THREE.BufferAttribute(diskPositions, 3));
-    diskGeometry.setAttribute('color', new THREE.BufferAttribute(diskColors, 3));
-    const diskMaterial = new THREE.PointsMaterial({ size: 0.5, vertexColors: true, transparent: true });
-    const accretionDisk = new THREE.Points(diskGeometry, diskMaterial);
-    scene.add(accretionDisk);
+const diskGeometry = new THREE.BufferGeometry();
+const diskCount = 600; // înainte: 1000
+const diskPositions = new Float32Array(diskCount * 3);
+const diskColors = new Float32Array(diskCount * 3);
+for (let i = 0; i < diskCount; i++) {
+  const radius = 12 + Math.random() * 5;
+  const theta = Math.random() * Math.PI * 2;
+  diskPositions[i * 3] = radius * Math.cos(theta);
+  diskPositions[i * 3 + 1] = (Math.random() - 0.5) * 0.3; // plutire mai compactă
+  diskPositions[i * 3 + 2] = radius * Math.sin(theta);
+  diskColors[i * 3] = 1;
+  diskColors[i * 3 + 1] = Math.random() * 0.5 + 0.5;
+  diskColors[i * 3 + 2] = 0;
+}
+diskGeometry.setAttribute('position', new THREE.BufferAttribute(diskPositions, 3));
+diskGeometry.setAttribute('color', new THREE.BufferAttribute(diskColors, 3));
+const diskMaterial = new THREE.PointsMaterial({ size: 0.4, vertexColors: true, transparent: true });
+const accretionDisk = new THREE.Points(diskGeometry, diskMaterial);
+scene.add(accretionDisk);
 
     // Starfield Parallax
     const starfieldLayers = [];
@@ -353,41 +348,51 @@
     createGalaxy();
 
     // Cosmic Dust
-    const dustCount = 500;
-    const dustGeometry = new THREE.BufferGeometry();
-    const dustPositions = new Float32Array(dustCount * 3);
-    const dustVelocities = new Float32Array(dustCount * 3);
-    for (let i = 0; i < dustCount; i++) {
-      dustPositions[i * 3] = (Math.random() - 0.5) * 200;
-      dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 200;
-      dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 200;
-      dustVelocities[i * 3] = (Math.random() - 0.5) * 0.1;
-      dustVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.1;
-      dustVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.1;
-    }
-    dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
-    const dustMaterial = new THREE.PointsMaterial({ size: 0.3, color: 0xaaaaaa, transparent: true });
-    const cosmicDust = new THREE.Points(dustGeometry, dustMaterial);
-    scene.add(cosmicDust);
+const dustCount = 200; // înainte: 500
+const dustGeometry = new THREE.BufferGeometry();
+const dustPositions = new Float32Array(dustCount * 3);
+const dustVelocities = new Float32Array(dustCount * 3);
+for (let i = 0; i < dustCount; i++) {
+  dustPositions[i * 3] = (Math.random() - 0.5) * 200;
+  dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+  dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+  // viteze mai mici
+  dustVelocities[i * 3] = (Math.random() - 0.5) * 0.05;
+  dustVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.05;
+  dustVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.05;
+}
+dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+const dustMaterial = new THREE.PointsMaterial({ size: 0.25, color: 0xaaaaaa, transparent: true });
+const cosmicDust = new THREE.Points(dustGeometry, dustMaterial);
+scene.add(cosmicDust);
 
     // Explosion Particles
-    const explosionGeometry = new THREE.BufferGeometry();
-    const explosionCount = 100;
-    const explosionPositions = new Float32Array(explosionCount * 3);
-    const explosionVelocities = new Float32Array(explosionCount * 3);
-    for (let i = 0; i < explosionCount; i++) {
-      explosionPositions[i * 3] = 0;
-      explosionPositions[i * 3 + 1] = 0;
-      explosionPositions[i * 3 + 2] = 0;
-      explosionVelocities[i * 3] = (Math.random() - 0.5) * 5;
-      explosionVelocities[i * 3 + 1] = (Math.random() - 0.5) * 5;
-      explosionVelocities[i * 3 + 2] = (Math.random() - 0.5) * 5;
-    }
-    explosionGeometry.setAttribute('position', new THREE.BufferAttribute(explosionPositions, 3));
-    const explosionMaterial = new THREE.PointsMaterial({ size: 0.5, color: 0xff5500, transparent: true });
-    const explosion = new THREE.Points(explosionGeometry, explosionMaterial);
-    explosion.visible = false;
-    scene.add(explosion);
+// Explosion Particles (număr redus la 50 și animare doar la nevoie)
+const explosionGeometry = new THREE.BufferGeometry();
+const explosionCount = 50; // înainte: 100
+const explosionPositions = new Float32Array(explosionCount * 3);
+const explosionVelocities = new Float32Array(explosionCount * 3);
+for (let i = 0; i < explosionCount; i++) {
+  // inițial toate la (0,0,0)
+  explosionPositions[i * 3] = 0;
+  explosionPositions[i * 3 + 1] = 0;
+  explosionPositions[i * 3 + 2] = 0;
+  // viteze mai mici
+  explosionVelocities[i * 3] = (Math.random() - 0.5) * 3;
+  explosionVelocities[i * 3 + 1] = (Math.random() - 0.5) * 3;
+  explosionVelocities[i * 3 + 2] = (Math.random() - 0.5) * 3;
+}
+explosionGeometry.setAttribute('position', new THREE.BufferAttribute(explosionPositions, 3));
+const explosionMaterial = new THREE.PointsMaterial({ size: 0.4, color: 0xff5500, transparent: true });
+const explosion = new THREE.Points(explosionGeometry, explosionMaterial);
+explosion.visible = false;
+scene.add(explosion);
+
+// În bucla de coliziune, activează doar când e nevoie:
+//   explosion.visible = true;
+//   setTimeout(() => { explosion.visible = false; }, 300);
+
+
 
     // Nebula Clouds
     const nebulaGeometry = new THREE.SphereGeometry(500, 32, 32);
@@ -491,7 +496,7 @@
     ];
 
     // Procedural Planet with Asteroids
-    const procPlanetGeometry = new THREE.SphereGeometry(7, 64, 64);
+const procPlanetGeometry = new THREE.SphereGeometry(7, 32, 32);
     const procPositions = procPlanetGeometry.attributes.position.array;
     for (let i = 0; i < procPositions.length; i += 3) {
       const x = procPositions[i];
@@ -565,7 +570,7 @@
         roughness: 0.7,
         metalness: 0.2
       });
-      const planet = new THREE.Mesh(new THREE.SphereGeometry(data.radius, 64, 64), material);
+const planet = new THREE.Mesh(new THREE.SphereGeometry(data.radius, 32, 32), material); 
       planet.position.x = data.distance;
       planet.castShadow = true;
       planet.receiveShadow = true;
@@ -974,25 +979,20 @@ window.addEventListener('keyup', (event) => {
     const lightIntensityInput = document.getElementById('lightIntensity');
     const cameraSpeedInput = document.getElementById('cameraSpeed');
     const bloomStrengthInput = document.getElementById('bloomStrength');
-    const dustReactivityInput = document.getElementById('dustReactivity');
     const starTypeSelect = document.getElementById('starType');
     const audioVolumeInput = document.getElementById('audioVolume');
     const animateCheckbox = document.getElementById('animate');
     const nebulaVisibleCheckbox = document.getElementById('nebulaVisible');
     const starLightCheckbox = document.getElementById('starLight');
-    const shieldModeCheckbox = document.getElementById('shieldMode');
     const freeCamButton = document.getElementById('freeCam');
     const shipCamButton = document.getElementById('shipCam');
     const cinematicCamButton = document.getElementById('cinematicCam');
     const resetShipButton = document.getElementById('resetShip');
-    const saveStateButton = document.getElementById('saveState');
-    const loadStateButton = document.getElementById('loadState');
     const fullscreenButton = document.getElementById('fullscreen');
     const planetSelect = document.getElementById('planetSelect');
     const planetXInput = document.getElementById('planetX');
     const planetYInput = document.getElementById('planetY');
     const planetZInput = document.getElementById('planetZ');
-    const movePlanetButton = document.getElementById('movePlanet');
     const createPlanetButton = document.getElementById('createPlanet');
     const newPlanetRadiusInput = document.getElementById('newPlanetRadius');
     const newPlanetOrbitInput = document.getElementById('newPlanetOrbit');
@@ -1029,9 +1029,7 @@ window.addEventListener('keyup', (event) => {
       bloomPass.strength = parseFloat(bloomStrengthInput.value);
     });
 
-    dustReactivityInput.addEventListener('input', () => {
-      // Affects dust particle reactivity
-    });
+
 
     starTypeSelect.addEventListener('change', () => {
       starTypeFilter = starTypeSelect.value;
@@ -1062,146 +1060,8 @@ window.addEventListener('keyup', (event) => {
       starLight.visible = starLightCheckbox.checked;
     });
 
-    shieldModeCheckbox.addEventListener('change', () => {
-// Înlocuiește secțiunea "Update Spaceship" din funcția animate() cu acest cod:
-// Update Spaceship
-if (spaceship.userData.isOrbiting) {
-  // Controlul direcției cu săgeți stânga-dreapta
-  if (keys['arrowright']) {
-    // Mișcare FOARTE lentă la dreapta
-    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.5;
-  } else if (keys['arrowleft']) {
-    // Mișcare FOARTE lentă la stânga
-    spaceship.userData.orbitAngle -= spaceship.userData.orbitSpeed * delta * 0.5;
-  } else {
-    // Mișcare automată EXTREM de lentă
-    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.1;
-  }
-  
-  // Controlul înălțimii - mișcare lentă și pe verticală
-  if (keys['arrowup']) {
-    spaceship.userData.orbitHeight += 0.5 * delta;
-  } else if (keys['arrowdown']) {
-    spaceship.userData.orbitHeight = Math.max(5, spaceship.userData.orbitHeight - 0.5 * delta);
-  }
 
-  // Calculează poziția pe orbită
-  const newX = spaceship.userData.orbitCenter.x + spaceship.userData.orbitRadius * Math.cos(spaceship.userData.orbitAngle);
-  const newZ = spaceship.userData.orbitCenter.z + spaceship.userData.orbitRadius * Math.sin(spaceship.userData.orbitAngle);
-  const newPosition = new THREE.Vector3(newX, spaceship.userData.orbitHeight, newZ);
-  
-  // Mișcare FOARTE lentă și fluidă prin interpolarea poziției
-  spaceship.position.lerp(newPosition, 0.02); // Factor de interpolare mic pentru mișcare lentă
-  
-  // Rotire lentă și fluidă a navei
-  const tangentDirection = new THREE.Vector3(
-    -Math.sin(spaceship.userData.orbitAngle),
-    0,
-    Math.cos(spaceship.userData.orbitAngle)
-  );
-  
-  const targetRotation = Math.atan2(tangentDirection.x, tangentDirection.z);
-  const currentRotation = spaceship.rotation.y;
-  let rotDiff = targetRotation - currentRotation;
-  
-  // Normalizare pentru rotire fluidă
-  if (rotDiff > Math.PI) rotDiff -= 2 * Math.PI;
-  if (rotDiff < -Math.PI) rotDiff += 2 * Math.PI;
-  
-  // Rotire FOARTE lentă
-  spaceship.rotation.y += rotDiff * 0.02;
-  
-  // Efecte vizuale pentru motoare
-  if (spaceship.children[3] && spaceship.children[4]) {
-    // Intensitate redusă pentru motoare (efect de mișcare lentă)
-    spaceship.children[3].material.emissiveIntensity = 0.4;
-    spaceship.children[4].material.emissiveIntensity = 0.4;
-  }
-} else {
-    // Modul normal de control direct - păstrăm acest cod pentru a putea schimba între moduri
-    // Forțe de mișcare mai mici pentru un zbor mai lent și controlat
-    const moveForce = spaceship.userData.speed * delta * 0.5;
-    
-    if (keys['w']) spaceship.userData.velocity.z -= moveForce;
-    if (keys['s']) spaceship.userData.velocity.z += moveForce;
-    if (keys['a']) spaceship.userData.velocity.x -= moveForce;
-    if (keys['d']) spaceship.userData.velocity.x += moveForce;
-    
-    // Adăugăm și control pe axa Y
-    if (keys['q']) spaceship.userData.velocity.y += moveForce;
-    if (keys['z']) spaceship.userData.velocity.y -= moveForce;
-
-    // Limitează viteza pentru un zbor mai stabil
-    const speed = spaceship.userData.velocity.length();
-    if (speed > spaceship.userData.maxSpeed) {
-      spaceship.userData.velocity.multiplyScalar(spaceship.userData.maxSpeed / speed);
-    }
-
-    // Efectul gravitațional redus considerabil
-    const bhPos = new THREE.Vector3(0, 0, 0);
-    const shipPos = spaceship.position;
-    const distanceToBH = shipPos.distanceTo(bhPos);
-    if (distanceToBH > 15) {
-      // Reduce forța gravitațională cu 90%
-      const gravityStrength = 10 / (distanceToBH * distanceToBH); // Redus de 100x
-      const gravityDir = bhPos.clone().sub(shipPos).normalize();
-      spaceship.userData.velocity.add(gravityDir.multiplyScalar(gravityStrength * delta));
-    }
-
-    // Adaugă frecare/rezistență mai mare pentru a încetini nava
-    spaceship.position.add(spaceship.userData.velocity.clone().multiplyScalar(delta));
-    spaceship.userData.velocity.multiplyScalar(0.97); // Frecare mai mare
-    
-    // Rotația mai lină a navei
-    const targetRotation = Math.atan2(spaceship.userData.velocity.x, spaceship.userData.velocity.z);
-    // Interpolăm pentru o rotație mai fluidă
-    const currentRotation = spaceship.rotation.y;
-    const rotDiff = targetRotation - currentRotation;
-    
-    // Normalizează diferența pentru a evita rotirea în direcția greșită
-    let normalizedDiff = rotDiff;
-    if (rotDiff > Math.PI) normalizedDiff -= 2 * Math.PI;
-    if (rotDiff < -Math.PI) normalizedDiff += 2 * Math.PI;
-    
-    // Rotește nava treptat către direcția de mișcare
-    spaceship.rotation.y += normalizedDiff * 0.1;
-    
-    // Afișează lumini de motor când se deplasează
-    const engineGlow = spaceship.userData.velocity.length() > 0.1;
-    if (spaceship.children[3] && spaceship.children[4]) {
-      spaceship.children[3].material.emissiveIntensity = engineGlow ? 0.8 : 0.2;
-      spaceship.children[4].material.emissiveIntensity = engineGlow ? 0.8 : 0.2;
-    }
-  }
-  
-  // Verifică coliziunea cu asteroizi (indiferent de modul de control)
-  if (!spaceship.userData.shield) {
-    for (let i = 0; i < asteroidCount; i++) {
-      const asteroidPos = asteroidPositions[i].position;
-      const distance = spaceship.position.distanceTo(asteroidPos);
-      if (distance < 4) {
-        if (spaceship.userData.isOrbiting) {
-          // Doar ajustează traiectoria în modul orbită
-          spaceship.userData.orbitAngle += 0.1;
-        } else {
-          // Respinge nava în modul de control direct
-          spaceship.userData.velocity.multiplyScalar(-0.5);
-        }
-        
-        if (audioInitialized && !collisionSound.isPlaying) collisionSound.play();
-        explosion.position.copy(spaceship.position);
-        explosion.visible = true;
-        setTimeout(() => { explosion.visible = false; }, 500);
-        document.getElementById('info').innerText = 'Collision with asteroid!';
-        setTimeout(() => {
-          document.getElementById('info').innerText = 'Use arrow keys to control orbit direction. Space to toggle control mode.';
-        }, 2000);
-        break;
-      }
-    }
-  }
-}
-    );
+ 
 
     freeCamButton.addEventListener('click', () => {
       cameraMode = 'free';
@@ -1250,86 +1110,15 @@ resetShipButton.addEventListener('click', () => {
   }
 });
 
-saveStateButton.addEventListener('click', () => {
-  const state = {
-    planets: planets.map(p => ({
-      position: p.position.toArray(),
-      targetPosition: p.userData.targetPosition ? p.userData.targetPosition.toArray() : p.position.toArray(),
-      distance: p.userData.distance || 0,
-      hasAsteroids: p.userData.hasAsteroids || false,
-      asteroids: (p.userData.asteroids || []).map(a => ({
-        position: a.position ? a.position.toArray() : [0, 0, 0],
-        orbitDistance: a.orbitDistance || 0,
-        angle: a.angle || 0,
-        orbitSpeed: a.orbitSpeed || 0
-      }))
-    })),
-    spaceship: spaceship ? {
-      position: spaceship.position.toArray(),
-      velocity: spaceship.userData.velocity ? spaceship.userData.velocity.toArray() : [0, 0, 0],
-      shield: spaceship.userData.shield || false
-    } : null
-  };
-  localStorage.setItem('galaxyState', JSON.stringify(state));
-document.getElementById('info').innerText = 'Click to focus, drag planets. Arrow keys for orbit direction. Z/X for orbit radius. Space toggles modes.';
-});
 
-    loadStateButton.addEventListener('click', () => {
-      const state = JSON.parse(localStorage.getItem('galaxyState'));
-      if (state) {
-        state.planets.forEach((p, i) => {
-          if (planets[i] && planets[i] !== spaceship) {
-            planets[i].position.fromArray(p.position);
-            planets[i].userData.targetPosition.fromArray(p.targetPosition);
-            planets[i].userData.distance = p.distance;
-            if (p.hasAsteroids) {
-              planets[i].userData.asteroids = p.asteroids.map(a => ({
-                position: new THREE.Vector3().fromArray(a.position),
-                orbitDistance: a.orbitDistance,
-                angle: a.angle,
-                orbitSpeed: a.orbitSpeed
-              }));
-              p.asteroids.forEach((a, j) => {
-                asteroidMatrix.setPosition(a.position);
-                asteroidMesh.setMatrixAt(j, asteroidMatrix);
-              });
-              asteroidMesh.instanceMatrix.needsUpdate = true;
-            }
-          }
-        });
-        if (state.spaceship && spaceship) {
-          spaceship.position.fromArray(state.spaceship.position);
-          spaceship.userData.velocity.fromArray(state.spaceship.velocity);
-          spaceship.userData.shield = state.spaceship.shield;
-          spaceship.children[0].visible = state.spaceship.shield;
-          shieldModeCheckbox.checked = state.spaceship.shield;
-        }
-        document.getElementById('info').innerText = 'State loaded!';
-        setTimeout(() => {
-          document.getElementById('info').innerText = 'Click to focus, drag planets to move. WASD for ship. Q/E/R for camera. Avoid asteroids!';
-        }, 2000);
-      }
-    });
+
+
 
     fullscreenButton.addEventListener('click', () => {
       if (!document.fullscreenElement) {
         document.documentElement.requestFullscreen();
       } else {
         document.exitFullscreen();
-      }
-    });
-
-    movePlanetButton.addEventListener('click', () => {
-      const index = parseInt(planetSelect.value);
-      const planet = planets[index];
-      if (planet !== spaceship) {
-        const newPos = new THREE.Vector3(
-          parseFloat(planetXInput.value),
-          parseFloat(planetYInput.value),
-          parseFloat(planetZInput.value)
-        );
-        planet.userData.targetPosition.copy(newPos);
-        planet.userData.distance = 0; // Disable orbit
       }
     });
 
@@ -1526,19 +1315,19 @@ createPlanetButton.addEventListener('click', () => {
 if (spaceship && spaceship.userData.isOrbiting) {
   // Controlul foarte lent al direcției cu săgeți stânga-dreapta
   if (keys['arrowright']) {
-    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.2;
+    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 1.0;
   } else if (keys['arrowleft']) {
-    spaceship.userData.orbitAngle -= spaceship.userData.orbitSpeed * delta * 0.2;
+    spaceship.userData.orbitAngle -= spaceship.userData.orbitSpeed * delta * 1.0;
   } else {
     // Mișcare automată foarte lentă
-    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.05;
+    spaceship.userData.orbitAngle += spaceship.userData.orbitSpeed * delta * 0.2;
   }
   
   // Controlul înălțimii - mișcare extrem de lentă pe verticală
   if (keys['arrowup']) {
-    spaceship.userData.orbitHeight += 0.2 * delta;
+    spaceship.userData.orbitHeight += 1.0 * delta;
   } else if (keys['arrowdown']) {
-    spaceship.userData.orbitHeight = Math.max(15, spaceship.userData.orbitHeight - 0.2 * delta);
+    spaceship.userData.orbitHeight = Math.max(15, spaceship.userData.orbitHeight - 1.0 * delta);
   }
 
   // Schimbarea razei orbitei - adăugat nou
